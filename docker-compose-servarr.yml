@@ -1,0 +1,523 @@
+# =============================================================================
+# SERVARR STACK - Download & Management Services  
+# =============================================================================
+# 
+# This stack handles all download and media management operations:
+# • VPN-protected downloads via Gluetun
+# • Torrent client (qBittorrent)  
+# • Indexer management (Prowlarr)
+# • Media automation (*arr suite: Sonarr, Radarr, Lidarr, Bazarr)
+# • File processing and organization (FileBot)
+# • Service dashboard (Homarr)
+# • Automatic updates (Watchtower)
+#
+# Network: 172.39.0.0/24 (isolated from streamarr stack)
+# Data: Shared /data volume with streamarr stack
+# Environment: Configure via .env-servarr file
+#
+# Deploy: docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
+# =============================================================================
+
+version: "3.8"
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  servarr-network:
+    name: servarr-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.39.0.0/24
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  # FileBot persistent data volume (shared between filebot-node and filebot-watcher)
+  filebot-data:
+    driver: local
+
+# =============================================================================
+# SERVICES
+# =============================================================================
+services:
+
+  # ---------------------------------------------------------------------------
+  # VPN GATEWAY
+  # ---------------------------------------------------------------------------
+  # Routes all download traffic through VPN for privacy and security
+  # Provides network gateway for qBittorrent and Prowlarr
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    hostname: gluetun
+    restart: unless-stopped
+    
+    # Network configuration
+    networks:
+      servarr-network:
+        ipv4_address: 172.39.0.2
+    
+    # Port forwarding for VPN-protected services
+    ports:
+      - "8080:8080"                           # qBittorrent web interface
+      - "6881:6881"                           # qBittorrent torrent port (TCP)
+      - "6881:6881/udp"                       # qBittorrent torrent port (UDP)
+      - "8090:8090"                           # SABnzbd web interface
+      - "9696:9696"                           # Prowlarr web interface
+    
+    # Required capabilities and devices
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    
+    # System configuration
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+    
+    # Persistent storage
+    volumes:
+      - ${SERVARR_CONFIG_PATH}/gluetun:/gluetun
+    
+    # VPN configuration (from environment file)
+    environment:
+      # VPN Provider Settings
+      - VPN_SERVICE_PROVIDER=${VPN_SERVICE_PROVIDER}
+      - VPN_TYPE=${VPN_TYPE:-openvpn}
+      - OPENVPN_USER=${OPENVPN_USER}
+      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
+      
+      # Server Selection
+      - SERVER_COUNTRIES=${SERVER_COUNTRIES}
+      - SERVER_CITIES=${SERVER_CITIES:-}
+      
+      # Network Security
+      - FIREWALL_VPN_INPUT_PORTS=${FIREWALL_VPN_INPUT_PORTS:-}
+      - FIREWALL_OUTBOUND_SUBNETS=172.39.0.0/24
+      
+      # Health Monitoring
+      - HEALTH_VPN_DURATION_INITIAL=${HEALTH_VPN_DURATION_INITIAL:-60s}
+      - LOG_LEVEL=${VPN_LOG_LEVEL:-info}
+    
+    # Health check to ensure VPN connectivity
+    healthcheck:
+      test: ping -c 1 www.google.com || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # DOWNLOAD CLIENTS
+  # ---------------------------------------------------------------------------
+  # BitTorrent client with web interface, routes through VPN
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    restart: unless-stopped
+    
+    # Use VPN network stack (no direct internet access)
+    network_mode: service:gluetun
+    
+    # Wait for VPN to be healthy before starting
+    depends_on:
+      gluetun:
+        condition: service_healthy
+        restart: true
+    
+    # User and system configuration
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - WEBUI_PORT=8080
+      - TORRENTING_PORT=${FIREWALL_VPN_INPUT_PORTS:-6881}
+    
+    # Persistent storage and shared data
+    volumes:
+      - ${SERVARR_CONFIG_PATH}/qbittorrent:/config
+      - ${DATA_PATH}:/data
+      - /etc/localtime:/etc/localtime:ro
+    
+    # Health monitoring
+    healthcheck:
+      test: ping -c 1 www.google.com || exit 1
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # USENET CLIENT
+  # ---------------------------------------------------------------------------
+  # SABnzbd Usenet downloader with web interface, routes through VPN
+  sabnzbd:
+    image: ghcr.io/hotio/sabnzbd:latest
+    container_name: sabnzbd
+    restart: unless-stopped
+    
+    # Use VPN network stack (no direct internet access)
+    network_mode: service:gluetun
+    
+    # Wait for VPN to be healthy before starting
+    depends_on:
+      gluetun:
+        condition: service_healthy
+        restart: true
+    
+    # User and system configuration
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - UMASK=002
+      - WEBUI_PORTS=8090/tcp,8090/udp
+    
+    # Persistent storage and shared data
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${SERVARR_CONFIG_PATH}/sabnzbd:/config
+      - ${DATA_PATH}:/data
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # INDEXER MANAGEMENT
+  # ---------------------------------------------------------------------------
+  # Unified indexer manager for torrent sites and Usenet providers
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    restart: unless-stopped
+    
+    # Use VPN network stack for indexer access
+    network_mode: service:gluetun
+    
+    # Wait for VPN to be healthy before starting
+    depends_on:
+      gluetun:
+        condition: service_healthy
+        restart: true
+    
+    # User and system configuration
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    
+    # Persistent storage
+    volumes:
+      - ${SERVARR_CONFIG_PATH}/prowlarr:/config
+      - /etc/localtime:/etc/localtime:ro
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # MEDIA MANAGEMENT - TV SHOWS
+  # ---------------------------------------------------------------------------
+  # Automated TV show downloading, organizing, and metadata management
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    hostname: sonarr
+    restart: unless-stopped
+    
+    # Direct network access (not through VPN)
+    networks:
+      servarr-network:
+        ipv4_address: 172.39.0.3
+    
+    # External access
+    ports:
+      - "${SONARR_PORT:-8989}:8989"
+    
+    # User and system configuration
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    
+    # Persistent storage and shared data
+    volumes:
+      - ${SERVARR_CONFIG_PATH}/sonarr:/config
+      - ${DATA_PATH}:/data
+      - /etc/localtime:/etc/localtime:ro
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # MEDIA MANAGEMENT - MOVIES
+  # ---------------------------------------------------------------------------
+  # Automated movie downloading, organizing, and metadata management
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    hostname: radarr
+    restart: unless-stopped
+    
+    # Direct network access (not through VPN)
+    networks:
+      servarr-network:
+        ipv4_address: 172.39.0.4
+    
+    # External access
+    ports:
+      - "${RADARR_PORT:-7878}:7878"
+    
+    # User and system configuration
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    
+    # Persistent storage and shared data
+    volumes:
+      - ${SERVARR_CONFIG_PATH}/radarr:/config
+      - ${DATA_PATH}:/data
+      - /etc/localtime:/etc/localtime:ro
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # MEDIA MANAGEMENT - MUSIC
+  # ---------------------------------------------------------------------------
+  # Automated music downloading, organizing, and metadata management
+  lidarr:
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr
+    hostname: lidarr
+    restart: unless-stopped
+    
+    # Direct network access (not through VPN)
+    networks:
+      servarr-network:
+        ipv4_address: 172.39.0.5
+    
+    # External access
+    ports:
+      - "${LIDARR_PORT:-8686}:8686"
+    
+    # User and system configuration
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    
+    # Persistent storage and shared data
+    volumes:
+      - ${SERVARR_CONFIG_PATH}/lidarr:/config
+      - ${DATA_PATH}:/data
+      - /etc/localtime:/etc/localtime:ro
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # MEDIA MANAGEMENT - SUBTITLES
+  # ---------------------------------------------------------------------------
+  # Automated subtitle downloading and management
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    hostname: bazarr
+    restart: unless-stopped
+    
+    # Direct network access (not through VPN)
+    networks:
+      servarr-network:
+        ipv4_address: 172.39.0.6
+    
+    # External access
+    ports:
+      - "${BAZARR_PORT:-6767}:6767"
+    
+    # User and system configuration
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    
+    # Persistent storage and shared data
+    volumes:
+      - ${SERVARR_CONFIG_PATH}/bazarr:/config
+      - ${DATA_PATH}:/data
+      - /etc/localtime:/etc/localtime:ro
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # FILE PROCESSING - WEB INTERFACE
+  # ---------------------------------------------------------------------------
+  # FileBot web interface for manual file processing and license management
+  filebot-node:
+    image: rednoah/filebot:node
+    container_name: filebot-node
+    hostname: filebot-node
+    restart: unless-stopped
+    
+    # Direct network access for web interface
+    networks:
+      servarr-network:
+        ipv4_address: 172.39.0.7
+    
+    # External access to web interface
+    ports:
+      - "${FILEBOT_PORT:-5452}:5452"
+    
+    # User and system configuration
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    
+    # Persistent storage and shared data
+    volumes:
+      - filebot-data:/data
+      - ${DATA_PATH}/downloads/:/volume1
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # FILE PROCESSING - AUTOMATIC WATCHER
+  # ---------------------------------------------------------------------------
+  # Automatic file monitoring and processing service
+  filebot-watcher:
+    image: rednoah/filebot:watcher
+    container_name: filebot-watcher
+    hostname: filebot-watcher
+    restart: unless-stopped
+    
+    # Internal network (no external access needed)
+    networks:
+      servarr-network:
+        ipv4_address: 172.39.0.8
+    
+    # User and system configuration
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - SETTLE_DOWN_TIME=${FILEBOT_SETTLE_TIME:-300}
+    
+    # Persistent storage and shared data
+    volumes:
+      - filebot-data:/data
+      - ${DATA_PATH}/:/data_path
+      - ${MEDIA_DATA_PATH}/:/media_data_path
+    
+    # Processing configuration
+    # Monitors: /data_path/downloads/complete (where qBittorrent saves completed files)
+    # Outputs:  /media_data_path/ (organized media for Plex)
+    # Action:   move (saves disk space)
+    # Conflict: auto (replace if better quality)
+    # Clean:    yes (remove leftover files)
+    command: >
+      /data_path/downloads/complete
+      --output /media_data_path/
+      --action move
+      --conflict auto
+      -non-strict
+      --log-file /data/amc.log
+      --def excludeList=/data/amc-exclude-list.txt
+      --def unsorted=y music=y artwork=y clean=y movieDB=TheMovieDB seriesDB=TheMovieDB::TV animeDB=TheMovieDB::TV musicDB=ID3 movieFormat="/media_data_path/{height > 2000 ? 'Upscaled Movies' : 'Movies'}/{info.OriginalLanguage}/{~plex}" animeFormat="/media_data_path/Anime/{info.OriginalLanguage}/{~plex}" seriesFormat="/media_data_path/TV Shows/{info.OriginalLanguage}/{~plex}" unsortedFormat="/media_data_path/Unsorted" "ut_label=%L" "ut_title=%N" "ut_kind=multi" "ut_dir=%F"
+      --def plex=${PLEX_TOKEN}
+      --def discord=${DISCORD_WEBHOOK}
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # SERVICE DASHBOARD
+  # ---------------------------------------------------------------------------
+  # Unified dashboard for managing all servarr services
+  homarr:
+    image: ghcr.io/ajnart/homarr:latest
+    container_name: homarr
+    hostname: homarr
+    restart: unless-stopped
+    
+    # Direct network access
+    networks:
+      servarr-network:
+        ipv4_address: 172.39.0.9
+    
+    # External access to dashboard
+    ports:
+      - "${HOMARR_PORT:-7575}:7575"
+    
+    # User and system configuration
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    
+    # Persistent storage and Docker integration
+    volumes:
+      - ${SERVARR_CONFIG_PATH}/homarr/configs:/app/data/configs
+      - ${SERVARR_CONFIG_PATH}/homarr/icons:/app/public/icons
+      - ${SERVARR_CONFIG_PATH}/homarr/data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # AUTOMATIC UPDATES
+  # ---------------------------------------------------------------------------
+  # Automatic container updates with cleanup and notifications
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    hostname: watchtower
+    restart: unless-stopped
+    
+    # Internal network (no external access needed)
+    networks:
+      servarr-network:
+        ipv4_address: 172.39.0.10
+    
+    # System configuration
+    environment:
+      - TZ=${TZ}
+      - WATCHTOWER_CLEANUP=${WATCHTOWER_CLEANUP:-true}
+      - WATCHTOWER_REMOVE_VOLUMES=${WATCHTOWER_REMOVE_VOLUMES:-false}
+      - WATCHTOWER_INCLUDE_STOPPED=${WATCHTOWER_INCLUDE_STOPPED:-true}
+      - WATCHTOWER_SCHEDULE=${WATCHTOWER_SCHEDULE:-0 6 * * *}
+      - WATCHTOWER_LABEL_ENABLE=${WATCHTOWER_LABEL_ENABLE:-true}
+      - WATCHTOWER_NOTIFICATIONS=${WATCHTOWER_NOTIFICATIONS:-}
+      - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL:-}
+      - WATCHTOWER_DEBUG=${WATCHTOWER_DEBUG:-false}
+    
+    # Docker socket access for container management
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+# =============================================================================
+# END OF SERVARR STACK CONFIGURATION
+# =============================================================================

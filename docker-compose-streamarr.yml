@@ -1,0 +1,223 @@
+# =============================================================================
+# STREAMARR STACK - Streaming & Request Management Services
+# =============================================================================
+#
+# This stack handles all media streaming and user request operations:
+# • Media server with transcoding (Plex)
+# • User request management (Overseerr)  
+# • Usage monitoring and analytics (Tautulli)
+# • Virtual TV channel management (ErsatzTV)
+#
+# Network: 172.40.0.0/24 (isolated from servarr stack)
+# Data: Shared /data volume with servarr stack (read-only media access)
+# Environment: Configure via .env-streamarr file
+#
+# Deploy: docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
+# =============================================================================
+
+version: "3.8"
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  streamarr-network:
+    name: streamarr-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.40.0.0/24
+
+# =============================================================================
+# SERVICES
+# =============================================================================
+services:
+
+  # ---------------------------------------------------------------------------
+  # MEDIA SERVER
+  # ---------------------------------------------------------------------------
+  # Plex Media Server with hardware transcoding and remote access
+  plex:
+    container_name: plex
+    image: ghcr.io/hotio/plex
+    restart: unless-stopped
+    
+    # Network configuration
+    networks:
+      streamarr-network:
+        ipv4_address: 172.40.0.2
+    
+    # Port mapping
+    ports:
+      - "32400:32400"
+    
+    # Environment configuration
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - UMASK=002
+      - TZ=${TZ}
+      - PLEX_CLAIM_TOKEN=${PLEX_CLAIM_TOKEN:-}
+      - PLEX_ADVERTISE_URL=${PLEX_ADVERTISE_URL:-}
+      - PLEX_NO_AUTH_NETWORKS=${PLEX_NO_AUTH_NETWORKS:-}
+      - PLEX_BETA_INSTALL=${PLEX_BETA_INSTALL:-false}
+      - PLEX_PURGE_CODECS=false
+    
+    # Hardware transcoding support
+    devices:
+      - /dev/dri:/dev/dri # QuickSync
+    
+    # Persistent storage and media access
+    volumes:
+      - ${STREAMARR_CONFIG_PATH}/plex:/config
+      - ${DATA_PATH}/plex_transcode:/transcode
+      - ${DATA_PATH}:/data
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # REQUEST MANAGEMENT
+  # ---------------------------------------------------------------------------
+  # User-friendly interface for content requests and management
+  overseerr:
+    container_name: overseerr
+    image: lscr.io/linuxserver/overseerr:latest
+    restart: unless-stopped
+    
+    # Network configuration
+    networks:
+      streamarr-network:
+        ipv4_address: 172.40.0.3
+    
+    # Port mapping
+    ports:
+      - "${OVERSEERR_PORT:-5055}:5055"
+    
+    # Environment configuration
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - LOG_LEVEL=${OVERSEERR_LOG_LEVEL:-info}
+    
+    # Persistent storage and media access
+    volumes:
+      - ${STREAMARR_CONFIG_PATH}/overseerr:/config
+      - /etc/localtime:/etc/localtime:ro
+    
+    # Health monitoring
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5055/api/v1/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # ANALYTICS & MONITORING
+  # ---------------------------------------------------------------------------
+  # Comprehensive Plex usage monitoring and statistics
+  tautulli:
+    container_name: tautulli
+    image: lscr.io/linuxserver/tautulli:latest
+    restart: unless-stopped
+    
+    # Network configuration
+    networks:
+      streamarr-network:
+        ipv4_address: 172.40.0.4
+    
+    # Port mapping
+    ports:
+      - "${TAUTULLI_PORT:-8181}:8181"
+    
+    # Environment configuration
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    
+    # Persistent storage and media access
+    volumes:
+      - ${STREAMARR_CONFIG_PATH}/tautulli:/config
+      - /etc/localtime:/etc/localtime:ro
+    
+    # Health monitoring
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # VIRTUAL TV CHANNEL MANAGEMENT
+  # ---------------------------------------------------------------------------
+  # ErsatzTV - Create virtual TV channels from your media library
+  ersatztv:
+    container_name: ersatztv
+    image: jasongdove/ersatztv:latest
+    restart: unless-stopped
+    
+    # Network configuration
+    networks:
+      streamarr-network:
+        ipv4_address: 172.40.0.5
+    
+    # Port mapping
+    ports:
+      - "${ERSATZTV_PORT:-8409}:8409"
+    
+    # Environment configuration
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    
+    # Persistent storage and media access
+    volumes:
+      - ${STREAMARR_CONFIG_PATH}/ersatztv:/root/.local/share/ersatztv
+      - ${DATA_PATH}:/data:ro
+      - /etc/localtime:/etc/localtime:ro
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+# =============================================================================
+# INTEGRATION NOTES
+# =============================================================================
+#
+# SERVARR STACK INTEGRATION:
+# • Shares media files via ${DATA_PATH}/media/ directory
+# • Overseerr communicates with Sonarr/Radarr via host networking
+# • Plex serves content processed by FileBot in servarr stack
+# • Tautulli monitors Plex activity and can trigger notifications
+# • ErsatzTV creates virtual TV channels from organized media
+#
+# NETWORK COMMUNICATION:
+# • Streamarr services: 172.40.0.0/24 network
+# • Servarr services: 172.39.0.0/24 network  
+# • Inter-stack communication via host networking
+# • No direct container-to-container networking between stacks
+#
+# DATA FLOW:
+# 1. Servarr stack: Downloads → Processing → /data/media/
+# 2. Streamarr stack: Serves content from /data/media/
+# 3. Users: Request content via Overseerr → Servarr stack
+# 4. Monitoring: Tautulli tracks usage → Optional notifications
+# 5. Virtual TV: ErsatzTV creates channels from media library
+#
+# =============================================================================
+# END OF STREAMARR STACK CONFIGURATION
+# =============================================================================
