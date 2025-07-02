@@ -52,60 +52,152 @@ This stack uses a **dual-stack architecture** with proper network isolation and 
 ## 🔧 Prerequisites
 
 - **Docker & Docker Compose** installed
-- **NAS/Server** with sufficient storage
-- **VPN Provider** account (Privado, NordVPN, etc.)
-- **Plex Pass** (optional, for hardware transcoding)
+- **NAS/Server** with sufficient storage (500GB+ recommended)
+- **VPN Provider** account (NordVPN, Privado, etc.)
+- **Plex Account** (Plex Pass recommended for hardware transcoding)
 - **FileBot License** (optional, for advanced processing)
+
+### System Requirements
+
+**Minimum:**
+- CPU: 2 cores
+- RAM: 8GB
+- Storage: 500GB
+- Network: 100Mbps
+
+**Recommended:**
+- CPU: 4+ cores with Intel QuickSync
+- RAM: 16GB+
+- Storage: 2TB+ (SSD for configs, HDD for media)
+- Network: Gigabit connection
 
 ## 🚀 Quick Start
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/yourusername/homelab-media-stack.git
+git clone https://github.com/bharry29/homelab-media-stack.git
 cd homelab-media-stack
 ```
 
-### 2. Run Setup Script
-```bash
-# Linux/Mac
-./scripts/setup.sh
+### 2. Create Directory Structure
 
-# Windows
-PowerShell -ExecutionPolicy Bypass -File scripts\setup.ps1
+#### **Linux/Mac/NAS Command Line:**
+```bash
+# Create base directories
+mkdir -p /volume1/docker/{servarr,streamarr}
+mkdir -p /volume1/data/{downloads/{complete,incomplete},media/{movies,tv,music},plex_transcode}
+
+# Set permissions (adjust PUID/PGID for your system)
+chown -R 1001:1000 /volume1/docker /volume1/data
 ```
 
-### 3. Configure Environment Files
+#### **NAS GUI (Synology, QNAP, Unraid):**
+1. **File Manager** → Create shared folder `docker`
+2. **File Manager** → Create shared folder `data`
+3. **Inside docker**: Create folders `servarr` and `streamarr`
+4. **Inside data**: Create folders:
+   - `downloads` (with subfolders `complete` and `incomplete`)
+   - `media` (with subfolders `movies`, `tv`, `music`)
+   - `plex_transcode`
+
+#### **Windows:**
+```powershell
+# Create directories
+New-Item -ItemType Directory -Path "C:\homelab\docker\servarr" -Force
+New-Item -ItemType Directory -Path "C:\homelab\docker\streamarr" -Force
+New-Item -ItemType Directory -Path "C:\homelab\data\downloads\complete" -Force
+New-Item -ItemType Directory -Path "C:\homelab\data\downloads\incomplete" -Force
+New-Item -ItemType Directory -Path "C:\homelab\data\media\movies" -Force
+New-Item -ItemType Directory -Path "C:\homelab\data\media\tv" -Force
+New-Item -ItemType Directory -Path "C:\homelab\data\media\music" -Force
+New-Item -ItemType Directory -Path "C:\homelab\data\plex_transcode" -Force
+```
+
+### 3. Create Docker Networks
 ```bash
-# Copy and edit environment files
+# Create isolated networks for the stacks
+docker network create --driver bridge --subnet=172.39.0.0/24 servarr-network
+docker network create --driver bridge --subnet=172.40.0.0/24 streamarr-network
+```
+
+### 4. Configure Environment Files
+```bash
+# Copy example files
 cp .env-servarr.example .env-servarr
 cp .env-streamarr.example .env-streamarr
-
-# Edit with your VPN credentials and settings
-nano .env-servarr      # Linux/Mac
-notepad .env-servarr   # Windows
 ```
 
-**Required Changes:**
-- `VPN_SERVICE_PROVIDER`: Your VPN provider
-- `OPENVPN_USER`: Your VPN username  
-- `OPENVPN_PASSWORD`: Your VPN password
-- `PLEX_CLAIM_TOKEN`: Get from https://plex.tv/claim
-- `PLEX_ADVERTISE_URL`: Your server's IP address
+#### **Edit .env-servarr:**
+```bash
+# System Configuration (find with: id)
+PUID=1001
+PGID=1000
+TZ=America/Los_Angeles
 
-### 4. Deploy Stacks
+# VPN Configuration - REQUIRED
+VPN_SERVICE_PROVIDER=nordvpn  # or privado, expressvpn, etc.
+OPENVPN_USER=your-vpn-username
+OPENVPN_PASSWORD=your-vpn-password
+SERVER_COUNTRIES=United States
+
+# Paths (adjust for your system)
+SERVARR_CONFIG_PATH=/volume1/docker/servarr
+DATA_PATH=/volume1/data
+MEDIA_DATA_PATH=/volume1/data/media
+```
+
+#### **Edit .env-streamarr:**
+```bash
+# System Configuration (same as servarr)
+PUID=1001
+PGID=1000
+TZ=America/Los_Angeles
+
+# Plex Configuration
+PLEX_CLAIM_TOKEN=claim-xxxxxxxxxx  # Get from https://plex.tv/claim
+PLEX_ADVERTISE_URL=http://192.168.1.100:32400  # Your server IP
+PLEX_NO_AUTH_NETWORKS=192.168.1.0/24,172.40.0.0/24
+
+# Paths
+STREAMARR_CONFIG_PATH=/volume1/docker/streamarr
+DATA_PATH=/volume1/data
+```
+
+### 5. Deploy Stacks
 ```bash
 # Start download & management stack
 docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
 
-# Wait for VPN connection, then start streaming stack
+# Wait for VPN connection (2-3 minutes), then start streaming stack
 docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
 ```
 
-### 5. Access Services
+### 6. Verify Deployment
+```bash
+# Check all containers are running
+docker ps
+
+# Verify VPN protection
+docker exec qbittorrent curl -s ifconfig.me
+# Should show VPN IP, not your real IP
+```
+
+## 🎯 Initial Configuration
+
+### Access Your Services
 - **Homarr Dashboard**: http://your-server-ip:7575
 - **Plex Media Server**: http://your-server-ip:32400/web
 - **Overseerr**: http://your-server-ip:5055
 - **qBittorrent**: http://your-server-ip:8080
+
+### Quick Setup Checklist
+1. **qBittorrent**: Change default password, set download paths
+2. **Sonarr/Radarr**: Add root folders, configure download client
+3. **Plex**: Add libraries, enable hardware transcoding
+4. **Overseerr**: Connect to Plex and *arr services
+5. **Prowlarr**: Add indexers and sync to *arr apps
+
+*See [Quick Start Guide](docs/QUICK_START.md) for detailed configuration steps.*
 
 ## 🔄 Data Flow & Processing
 
@@ -133,12 +225,76 @@ docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
 - **No direct internet access** for download clients
 - **Controlled communication** between service stacks
 
+## 🔄 Maintenance
+
+### Updates
+**Automatic (Recommended):**
+- Watchtower updates containers automatically
+
+**Manual:**
+```bash
+# Pull latest images
+docker-compose --env-file .env-servarr -f docker-compose-servarr.yml pull
+docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml pull
+
+# Restart with new images
+docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
+docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
+```
+
+### Monitoring
+```bash
+# Run health check (if you have the script)
+./scripts/health-check.sh
+
+# Check VPN protection
+docker exec qbittorrent curl -s ifconfig.me
+
+# View container status
+docker ps
+```
+
+### Backups
+```bash
+# Create backup (if you have the script)
+./scripts/backup.sh --full
+
+# Manual backup of critical configs
+tar -czf backup-$(date +%Y%m%d).tar.gz /volume1/docker/
+```
+
+## 🛠️ Platform-Specific Notes
+
+### **Synology NAS**
+- Use Container Manager (new Docker package)
+- Create shared folders via File Station
+- Enable SSH for command-line access
+- Set PUID/PGID to match DSM user (usually 1026:100)
+
+### **QNAP NAS**
+- Install Container Station
+- Use File Manager for directory creation
+- Enable SSH via QTS settings
+- Adjust PUID/PGID for QTS user
+
+### **Unraid**
+- Use Community Applications for Docker
+- Create user shares for directories
+- Enable SSH via Unraid settings
+- Set PUID/PGID to match Unraid user (usually 99:100)
+
+### **Windows**
+- Install Docker Desktop
+- Use PowerShell for directory creation
+- Adjust paths in environment files (C:\homelab\...)
+- Set PUID/PGID to 1000:1000
+
 ## 📚 Documentation
 
-- [Quick Start Guide](docs/QUICK_START.md) - Get running in 30 minutes
+- [Quick Start Guide](docs/QUICK_START.md) - 30-minute detailed setup
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [Directory Structure](docs/DIRECTORY_STRUCTURE.md) - Complete data flow explanation
-- [Advanced Configuration](docs/ADVANCED_CONFIG.md) - Customization options
+- [Contributing Guidelines](CONTRIBUTING.md) - How to contribute
 
 ## 🎯 Key Features
 
@@ -153,46 +309,13 @@ docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
 - **Auto Updates**: Watchtower keeps containers current
 - **Health Monitoring**: Built-in health checks and restart policies
 
-## ⚙️ System Requirements
-
-### Minimum Setup
-- **CPU**: 2 cores (Intel preferred for QuickSync)
-- **RAM**: 8GB
-- **Storage**: 500GB (SSD recommended for configs)
-- **Network**: 100Mbps internet connection
-
-### Recommended Setup
-- **CPU**: 4+ cores with Intel QuickSync
-- **RAM**: 16GB+
-- **Storage**: 2TB+ (separate SSD for configs, HDD for media)
-- **Network**: Gigabit internet connection
-
-## 🚀 Advanced Features
-
-### Hardware Transcoding
-- **Intel QuickSync**: Pre-configured for supported CPUs
-- **NVIDIA GPU**: Modify compose file for NVENC support
-- **Software Fallback**: Works without hardware acceleration
-
-### Custom FileBot Processing
-- **Automated organization**: Movies, TV shows, music
-- **Quality detection**: 4K, HDR, Dolby Vision support
-- **Webhook notifications**: Discord/Slack integration
-- **Custom naming**: Fully customizable file organization
-
-### Monitoring & Analytics
-- **Tautulli**: Comprehensive Plex usage statistics
-- **Health checks**: Container and service monitoring
-- **Notifications**: Discord, Slack, email alerts
-- **Performance**: Resource usage tracking
-
 ## 🤝 Contributing
 
 Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting pull requests.
 
 ### Areas for Contribution
+- **Platform-specific guides** (Synology, Unraid, Proxmox, etc.)
 - **Additional VPN providers** configuration examples
-- **Platform-specific guides** (Synology, Unraid, etc.)
 - **Enhanced monitoring** and alerting integrations
 - **Documentation improvements** and translations
 - **Security enhancements** and best practices
@@ -200,8 +323,8 @@ Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTIN
 ## 🆘 Support
 
 - **Documentation**: Check the [docs/](docs/) directory
-- **Issues**: Open a [GitHub issue](https://github.com/yourusername/homelab-media-stack/issues)
-- **Discussions**: Join [GitHub Discussions](https://github.com/yourusername/homelab-media-stack/discussions)
+- **Issues**: Open a [GitHub issue](https://github.com/bharry29/homelab-media-stack/issues)
+- **Discussions**: Join [GitHub Discussions](https://github.com/bharry29/homelab-media-stack/discussions)
 - **Community**: Reddit r/selfhosted, r/homelab, r/PleX
 
 ## 📄 License
@@ -224,10 +347,6 @@ The authors assume no responsibility for misuse of this software.
 - **Inspired by**: [TechHutTV Homelab](https://github.com/TechHutTV/homelab/blob/main/media/)
 - **Built with**: Docker, Docker Compose, and the excellent work of the *arr developers
 - **Special thanks**: To the selfhosted community for continuous innovation
-
-## 📈 Star History
-
-If this project helped you, please consider giving it a ⭐ on GitHub!
 
 ---
 
