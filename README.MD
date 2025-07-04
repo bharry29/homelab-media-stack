@@ -71,17 +71,98 @@ This stack uses a **dual-stack architecture** with proper network isolation and 
 - Storage: 2TB+ (SSD for configs, HDD for media)
 - Network: Gigabit connection
 
-## 🚀 Quick Start
+## 🚀 Quick Start - Choose Your Path
 
-### 1. Clone Repository
+### 🌟 **Option A: Automated Setup (Recommended for Beginners)**
+
+**Perfect for users who:**
+- ✅ Want a hassle-free, guided setup experience
+- ✅ Are new to Docker or homelab setups
+- ✅ Prefer automated platform detection and configuration
+- ✅ Want to get up and running in under 10 minutes
+
+#### **🎯 One-Command Setup**
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/bharry29/homelab-media-stack.git
+cd homelab-media-stack
+
+# 2. Run the universal setup script
+./scripts/setup.sh
+```
+
+**That's it!** The script will:
+- 🔍 **Auto-detect your platform** (Windows, macOS, Linux, Synology, QNAP, Unraid, etc.)
+- ✅ **Check prerequisites** (Docker, Docker Compose)
+- 📁 **Create all directories** with proper permissions
+- ⚙️ **Configure environment files** with your system settings
+- 🌐 **Set up Docker networks** for security isolation
+- 🚀 **Deploy both stacks** (optional)
+- 📊 **Show all service URLs** for easy access
+
+#### **💻 Platform-Specific Instructions**
+
+**Linux/macOS/NAS:**
+```bash
+chmod +x scripts/setup.sh
+./scripts/setup.sh
+```
+
+**Windows (choose one):**
+```bash
+# Option 1: WSL2 (Recommended)
+wsl
+./scripts/setup.sh
+
+# Option 2: Git Bash
+./scripts/setup.sh
+
+# Option 3: PowerShell via WSL
+wsl --exec ./scripts/setup.sh
+```
+
+#### **🎮 What You'll See**
+The setup script provides a beautiful, interactive experience:
+```
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                          HOMELAB MEDIA STACK                                 ║
+║                       Universal Setup Script v2.0                            ║
+║  Supports: Windows • macOS • Linux • Synology • UGREEN • QNAP               ║
+║           TrueNAS • Unraid • Proxmox • And More!                            ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+● Detecting your platform...
+✓ Detected platform: synology
+✓ Default path: /volume1
+✓ PUID/PGID: 1026:100
+
+Please confirm or select your platform:
+1) Synology NAS
+2) UGREEN NAS  
+3) QNAP NAS
+[... and more]
+```
+
+---
+
+### 🛠️ **Option B: Manual Setup (For Experienced Users)**
+
+**Perfect for users who:**
+- ✅ Want full control over the setup process
+- ✅ Have experience with Docker and containerization
+- ✅ Prefer to understand each step in detail
+- ✅ Need custom configurations beyond the script
+
+#### **1. Clone Repository**
 ```bash
 git clone https://github.com/bharry29/homelab-media-stack.git
 cd homelab-media-stack
 ```
 
-### 2. Create Directory Structure
+#### **2. Create Directory Structure**
 
-#### **Linux/Mac/NAS Command Line:**
+**Linux/Mac/NAS Command Line:**
 ```bash
 # Create base directories
 mkdir -p /volume1/docker/{servarr,streamarr}
@@ -91,7 +172,7 @@ mkdir -p /volume1/data/{downloads/{complete,incomplete},media/{movies,tv,music},
 chown -R 1001:1000 /volume1/docker /volume1/data
 ```
 
-#### **NAS GUI (Synology, QNAP, Unraid):**
+**NAS GUI (Synology, QNAP, Unraid):**
 1. **File Manager** → Create shared folder `docker`
 2. **File Manager** → Create shared folder `data`
 3. **Inside docker**: Create folders `servarr` and `streamarr`
@@ -100,7 +181,7 @@ chown -R 1001:1000 /volume1/docker /volume1/data
    - `media` (with subfolders `movies`, `tv`, `music`)
    - `plex_transcode`
 
-#### **Windows:**
+**Windows:**
 ```powershell
 # Create directories
 New-Item -ItemType Directory -Path "C:\homelab\docker\servarr" -Force
@@ -113,21 +194,21 @@ New-Item -ItemType Directory -Path "C:\homelab\data\media\music" -Force
 New-Item -ItemType Directory -Path "C:\homelab\data\plex_transcode" -Force
 ```
 
-### 3. Create Docker Networks
+#### **3. Create Docker Networks**
 ```bash
 # Create isolated networks for the stacks
 docker network create --driver bridge --subnet=172.39.0.0/24 servarr-network
 docker network create --driver bridge --subnet=172.40.0.0/24 streamarr-network
 ```
 
-### 4. Configure Environment Files
+#### **4. Configure Environment Files**
 ```bash
 # Copy example files
 cp .env-servarr.example .env-servarr
 cp .env-streamarr.example .env-streamarr
 ```
 
-#### **Edit .env-servarr:**
+**Edit .env-servarr:**
 ```bash
 # System Configuration (find with: id)
 PUID=1001
@@ -146,7 +227,7 @@ DATA_PATH=/volume1/data
 MEDIA_DATA_PATH=/volume1/data/media
 ```
 
-#### **Edit .env-streamarr:**
+**Edit .env-streamarr:**
 ```bash
 # System Configuration (same as servarr)
 PUID=1001
@@ -163,7 +244,7 @@ STREAMARR_CONFIG_PATH=/volume1/docker/streamarr
 DATA_PATH=/volume1/data
 ```
 
-### 5. Deploy Stacks
+#### **5. Deploy Stacks**
 ```bash
 # Start download & management stack
 docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
@@ -172,7 +253,7 @@ docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
 docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
 ```
 
-### 6. Verify Deployment
+#### **6. Verify Deployment**
 ```bash
 # Check all containers are running
 docker ps
@@ -181,6 +262,8 @@ docker ps
 docker exec qbittorrent curl -s ifconfig.me
 # Should show VPN IP, not your real IP
 ```
+
+---
 
 ## 🎯 Initial Configuration
 
@@ -242,21 +325,15 @@ docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
 docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
 ```
 
-### Monitoring
+### Monitoring & Backups
 ```bash
-# Run health check (if you have the script)
-./scripts/health-check.sh
+# Health monitoring (if setup script was used)
+./scripts/healthcheck.sh
 
 # Check VPN protection
 docker exec qbittorrent curl -s ifconfig.me
 
-# View container status
-docker ps
-```
-
-### Backups
-```bash
-# Create backup (if you have the script)
+# Create backups (if setup script was used)
 ./scripts/backup.sh --full
 
 # Manual backup of critical configs
@@ -291,6 +368,7 @@ tar -czf backup-$(date +%Y%m%d).tar.gz /volume1/docker/
 
 ## 📚 Documentation
 
+- [Scripts Documentation](scripts/README.md) - Universal setup script and utilities
 - [Quick Start Guide](docs/QUICK_START.md) - 30-minute detailed setup
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [Directory Structure](docs/DIRECTORY_STRUCTURE.md) - Complete data flow explanation
@@ -298,23 +376,44 @@ tar -czf backup-$(date +%Y%m%d).tar.gz /volume1/docker/
 
 ## 🎯 Key Features
 
-- **Complete Automation**: From request to streaming with minimal intervention
-- **VPN Security**: All downloads protected with kill switch
-- **Network Isolation**: Separate networks for security and performance
-- **FileBot Integration**: Automated file organization and renaming
-- **Hardware Transcoding**: Intel QuickSync support for efficient streaming
-- **Request Management**: User-friendly interface via Overseerr
-- **Analytics**: Comprehensive monitoring via Tautulli
-- **Virtual TV**: Create custom TV channels with ErsatzTV
-- **Auto Updates**: Watchtower keeps containers current
-- **Health Monitoring**: Built-in health checks and restart policies
+- **🚀 Universal Setup Script**: One script works on all platforms (Windows, macOS, Linux, NAS)
+- **🧠 Smart Platform Detection**: Automatically configures for your system
+- **🛡️ VPN-First Security**: All downloads protected with kill switch
+- **🌐 Network Isolation**: Separate networks for security and performance
+- **🗂️ FileBot Integration**: Automated file organization and renaming
+- **💻 Hardware Transcoding**: Intel QuickSync support for efficient streaming
+- **📱 Request Management**: User-friendly interface via Overseerr
+- **📊 Analytics**: Comprehensive monitoring via Tautulli
+- **📺 Virtual TV**: Create custom TV channels with ErsatzTV
+- **🔄 Auto Updates**: Watchtower keeps containers current
+- **🩺 Health Monitoring**: Built-in health checks and restart policies
+
+## 🌟 Why Choose This Stack?
+
+### **For Beginners:**
+- **🎯 One-command setup** gets you running in minutes
+- **🔍 Auto-detection** handles platform-specific configurations
+- **📚 Comprehensive documentation** guides you through everything
+- **🛡️ Security by default** with VPN protection built-in
+
+### **For Advanced Users:**
+- **🔧 Full manual control** over every aspect of the setup
+- **📋 Modular architecture** allows customization and extension
+- **🌐 Network isolation** for enterprise-grade security
+- **🔄 GitOps ready** with version-controlled configurations
+
+### **For Everyone:**
+- **🌍 Universal compatibility** across all major platforms
+- **🚀 Production-ready** with enterprise-grade features
+- **💰 Cost-effective** using open-source components
+- **👥 Active community** support and contributions
 
 ## 🤝 Contributing
 
 Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting pull requests.
 
 ### Areas for Contribution
-- **Platform-specific guides** (Synology, Unraid, Proxmox, etc.)
+- **Platform-specific guides** (additional NAS systems, virtualization platforms)
 - **Additional VPN providers** configuration examples
 - **Enhanced monitoring** and alerting integrations
 - **Documentation improvements** and translations
@@ -322,10 +421,11 @@ Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTIN
 
 ## 🆘 Support
 
-- **Documentation**: Check the [docs/](docs/) directory
-- **Issues**: Open a [GitHub issue](https://github.com/bharry29/homelab-media-stack/issues)
-- **Discussions**: Join [GitHub Discussions](https://github.com/bharry29/homelab-media-stack/discussions)
-- **Community**: Reddit r/selfhosted, r/homelab, r/PleX
+- **🔧 Setup Issues**: Use the automated setup script or check [Troubleshooting Guide](docs/TROUBLESHOOTING.md)
+- **📖 Documentation**: Check the [docs/](docs/) directory
+- **🐛 Bug Reports**: Open a [GitHub issue](https://github.com/bharry29/homelab-media-stack/issues)
+- **💬 Discussions**: Join [GitHub Discussions](https://github.com/bharry29/homelab-media-stack/discussions)
+- **👥 Community**: Reddit r/selfhosted, r/homelab, r/PleX
 
 ## 📄 License
 
@@ -344,7 +444,7 @@ The authors assume no responsibility for misuse of this software.
 ## 🌟 Acknowledgments
 
 - **Created by**: [The Garage Labs](https://thegaragelabs.cc)
-- **Inspired by**: [TechHutTV Homelab](https://github.com/TechHutTV/homelab/blob/main/media/)
+- **Inspired by**: [TechHutTV Homelab](https://github.com/TechHutTV/homelab/blob/main/media/) and [TRaSH-Guides](https://trash-guides.info)
 - **Built with**: Docker, Docker Compose, and the excellent work of the *arr developers
 - **Special thanks**: To the selfhosted community for continuous innovation
 
