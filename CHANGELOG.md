@@ -72,6 +72,7 @@ The first stable release of the Homelab Media Stack - a comprehensive, productio
 
 #### **Core Documentation**
 - **README.md** - Comprehensive project overview and setup guide
+- **COMMUNITY_IMPACT.md** - Project value and community impact analysis
 - **QUICK_START.md** - 30-minute setup guide for immediate deployment
 - **TROUBLESHOOTING.md** - Extensive troubleshooting guide with solutions
 - **CONTRIBUTING.md** - Community contribution guidelines and standards

@@ -368,6 +368,7 @@ tar -czf backup-$(date +%Y%m%d).tar.gz /volume1/docker/
 
 ## 📚 Documentation
 
+- [Community Impact & Project Value](docs/COMMUNITY_IMPACT.md) - Why this project matters
 - [Scripts Documentation](scripts/README.md) - Universal setup script and utilities
 - [Quick Start Guide](docs/QUICK_START.md) - 30-minute detailed setup
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
@@ -407,6 +408,8 @@ tar -czf backup-$(date +%Y%m%d).tar.gz /volume1/docker/
 - **🚀 Production-ready** with enterprise-grade features
 - **💰 Cost-effective** using open-source components
 - **👥 Active community** support and contributions
+
+> **💡 Want to understand the full impact?** Read our [Community Impact & Project Value](docs/COMMUNITY_IMPACT.md) analysis to see why this project is transforming the self-hosted media landscape.
 
 ## 🤝 Contributing
 

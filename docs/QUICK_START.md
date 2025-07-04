@@ -271,6 +271,7 @@ Health monitoring: Use ./scripts/health-check.sh if available
 🆘 Need Help?
 Check the main README.md for detailed information
 Review TROUBLESHOOTING.md for common issues
+Read COMMUNITY_IMPACT.md to understand the project's vision and value
 Open a GitHub Issue for bugs
 Join GitHub Discussions for questions
 Total Setup Time: ~30 minutes for basic functionality
