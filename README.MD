@@ -97,9 +97,10 @@ cd homelab-media-stack
 - ✅ **Check prerequisites** (Docker, Docker Compose)
 - 📁 **Create all directories** with proper permissions
 - ⚙️ **Configure environment files** with your system settings
-- 🌐 **Set up Docker networks** for security isolation
+- 🌐 **Handle Docker networks** automatically (no conflicts!)
 - 🚀 **Deploy both stacks** (optional)
 - 📊 **Show all service URLs** for easy access
+- 🛡️ **Validate VPN protection** and security
 
 #### **💻 Platform-Specific Instructions**
 
@@ -123,16 +124,17 @@ wsl --exec ./scripts/setup.sh
 ```
 
 #### **🎮 What You'll See**
-The setup script provides a beautiful, interactive experience:
+The setup script provides a beautiful, interactive experience with colorful output and progress indicators:
+
 ```
 ╔═══════════════════════════════════════════════════════════════════════════════╗
-║                          HOMELAB MEDIA STACK                                 ║
-║                       Universal Setup Script v2.0                            ║
-║  Supports: Windows • macOS • Linux • Synology • UGREEN • QNAP               ║
-║           TrueNAS • Unraid • Proxmox • And More!                            ║
+║                          HOMELAB MEDIA STACK                                  ║
+║                       Universal Setup Script v2.0                             ║
+║  Supports: Windows • macOS • Linux • Synology • UGREEN • QNAP                 ║
+║           TrueNAS • Unraid • Proxmox • And More!                              ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-● Detecting your platform...
+🔍 Detecting your platform...
 ✓ Detected platform: synology
 ✓ Default path: /volume1
 ✓ PUID/PGID: 1026:100
@@ -141,7 +143,64 @@ Please confirm or select your platform:
 1) Synology NAS
 2) UGREEN NAS  
 3) QNAP NAS
-[... and more]
+4) TrueNAS
+5) Unraid
+6) Proxmox VE
+7) Windows (WSL2/Git Bash)
+8) macOS
+9) Linux (Generic)
+0) Custom/Other
+
+[?] Select platform (1-9, 0 for custom): 
+
+📋 Prerequisites Check:
+✓ Docker is installed and running
+✓ Docker Compose is available
+✓ Sufficient disk space available
+
+📁 Creating directory structure...
+[████████████████████] 100% Complete
+
+⚙️ Configuring environment files...
+✓ .env-servarr configured
+✓ .env-streamarr configured
+
+🌐 Checking Docker networks...
+⚠️  Found existing network: servarr-network
+   Checking if network is in use...
+   Network is unused, removing...
+✓ Network conflicts resolved
+
+🚀 Deploying servarr stack...
+[████████████████████] 100% Complete
+✓ All servarr services started successfully
+
+🛡️ Validating VPN protection...
+✓ VPN connection established
+✓ Download traffic protected
+
+🚀 Deploying streamarr stack...
+[████████████████████] 100% Complete
+✓ All streamarr services started successfully
+
+🎉 Setup Complete! Your services are ready:
+
+🏠 Homarr Dashboard:     http://192.168.1.100:7575
+⬇️ qBittorrent:         http://192.168.1.100:8080
+🎬 Plex Media Server:   http://192.168.1.100:32400/web
+📱 Overseerr:           http://192.168.1.100:5055
+📺 Sonarr:              http://192.168.1.100:8989
+🎥 Radarr:              http://192.168.1.100:7878
+📊 Tautulli:            http://192.168.1.100:8181
+
+Next steps:
+1. Access Homarr Dashboard for service overview
+2. Configure qBittorrent password and download paths
+3. Set up Plex libraries and hardware transcoding
+4. Add indexers in Prowlarr
+5. Configure Overseerr for request management
+
+Need help? Check docs/QUICK_START.md for detailed configuration steps.
 ```
 
 ---
@@ -356,6 +415,52 @@ tar -czf backup-$(date +%Y%m%d).tar.gz /volume1/docker/
 # - Preserves your media data and project files
 ```
 
+**What the uninstall script shows:**
+```
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                          HOMELAB MEDIA STACK                                  ║
+║                        Uninstall Script v2.0                                  ║
+║                    Complete Cleanup & Removal                                 ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+⚠️  WARNING: This will completely remove your homelab media stack!
+   This action cannot be undone.
+
+   What will be removed:
+   • All Docker containers and services
+   • Docker networks (servarr-network, streamarr-network)
+   • Generated environment files (.env-servarr, .env-streamarr)
+   • Backup files created during setup
+
+   What will be preserved:
+   • Your media files (movies, TV shows, music)
+   • Project files and documentation
+   • Any custom configurations you've created
+
+[?] Are you sure you want to continue? (y/N): y
+
+🔄 Stopping all services...
+[████████████████████] 100% Complete
+✓ All containers stopped
+
+🗑️ Removing containers...
+[████████████████████] 100% Complete
+✓ All containers removed
+
+🌐 Removing Docker networks...
+✓ servarr-network removed
+✓ streamarr-network removed
+
+📁 Cleaning up files...
+✓ .env-servarr removed
+✓ .env-streamarr removed
+✓ Backup files cleaned up
+
+🎉 Uninstall Complete!
+   Your media data and project files have been preserved.
+   To reinstall, simply run: ./scripts/setup.sh
+```
+
 ## 🛠️ Platform-Specific Notes
 
 ### **Synology NAS**
@@ -404,6 +509,10 @@ tar -czf backup-$(date +%Y%m%d).tar.gz /volume1/docker/
 - **📺 Virtual TV**: Create custom TV channels with ErsatzTV
 - **🔄 Auto Updates**: Watchtower keeps containers current
 - **🩺 Health Monitoring**: Built-in health checks and restart policies
+- **🗑️ Complete Uninstall**: Safe and thorough cleanup with data preservation
+- **🎨 Beautiful UI**: Colored output and progress animations in all scripts
+- **🔧 Conflict Resolution**: Automatic handling of Docker network conflicts
+- **📋 Comprehensive Documentation**: Complete guides for all skill levels
 
 ## 🌟 Why Choose This Stack?
 
