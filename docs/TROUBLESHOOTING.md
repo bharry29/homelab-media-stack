@@ -12,6 +12,9 @@ docker ps -a
 # Check specific stack
 docker-compose --env-file .env-servarr -f docker-compose-servarr.yml ps
 docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml ps
+
+# Check Docker networks
+docker network ls | grep -E "(servarr|streamarr)"
 ```
 
 ### Check Logs
@@ -178,6 +181,34 @@ sudo chown -R 1001:1000 /volume1/data/downloads/
 
 ### 3. Network & Connectivity Issues
 
+#### Problem: Docker network conflicts during setup
+```bash
+# Check for existing networks
+docker network ls | grep -E "(servarr|streamarr)"
+
+# Check if networks are in use
+docker network inspect servarr-network
+docker network inspect streamarr-network
+```
+
+**Solutions:**
+```bash
+# 1. Remove conflicting networks (if no containers are attached)
+docker network rm servarr-network
+docker network rm streamarr-network
+
+# 2. Let Docker Compose recreate networks
+docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
+docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
+
+# 3. Use the setup script which handles conflicts automatically
+./scripts/setup.sh
+
+# 4. Complete cleanup and restart
+./scripts/uninstall.sh
+./scripts/setup.sh
+```
+
 #### Problem: Can't access web interfaces
 ```bash
 # Check if containers are running
@@ -230,8 +261,9 @@ docker network inspect streamarr-network
 
 # 2. Recreate networks if needed
 docker network rm servarr-network streamarr-network
-docker network create --driver bridge --subnet=172.39.0.0/24 servarr-network
-docker network create --driver bridge --subnet=172.40.0.0/24 streamarr-network
+# Docker Compose will recreate networks automatically on next deployment
+docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
+docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
 
 # 3. Restart services
 docker-compose --env-file .env-servarr -f docker-compose-servarr.yml restart

@@ -436,6 +436,32 @@ cleanup_docker_system() {
 }
 
 #################################################################################################################################################
+# Remove Docker networks (custom)
+#################################################################################################################################################
+remove_custom_networks() {
+    local networks=("servarr-network" "streamarr-network")
+    for net in "${networks[@]}"; do
+        if docker network ls | grep -q "${net}"; then
+            # Check if any containers are attached
+            containers=$(docker network inspect "$net" --format '{{range $k,$v := .Containers}}{{$k}} {{end}}')
+            if [[ -z "$containers" ]]; then
+                if docker network rm "$net" > /dev/null 2>&1; then
+                    printf '\n%b\n' " ${utick} Removed Docker network: ${clc}${net}${cend}"
+                else
+                    printf '\n%b\n' " ${ucross} Failed to remove Docker network: ${clc}${net}${cend}"
+                fi
+            else
+                printf '\n%b\n' " ${cy}⚠️  Could not remove network ${clc}${net}${cend} because it is still in use by containers:${cend}"
+                for c in $containers; do
+                    printf '\n%b\n' "   - $c"
+                done
+                printf '\n%b\n' " ${uyc} To remove manually: ${clc}docker network disconnect ${net} <container_name> && docker network rm ${net}${cend}"
+            fi
+        fi
+    done
+}
+
+#################################################################################################################################################
 # Main execution
 #################################################################################################################################################
 main() {
@@ -486,8 +512,8 @@ main() {
         remove_docker_files_only "$installation"
     done
     
-    # Remove Docker networks
-    remove_docker_networks
+    # Remove Docker networks (custom)
+    remove_custom_networks
     
     # Remove Docker volumes
     remove_docker_volumes

@@ -194,11 +194,14 @@ New-Item -ItemType Directory -Path "C:\homelab\data\media\music" -Force
 New-Item -ItemType Directory -Path "C:\homelab\data\plex_transcode" -Force
 ```
 
-#### **3. Create Docker Networks**
+#### **3. Deploy the Stacks**
 ```bash
-# Create isolated networks for the stacks
-docker network create --driver bridge --subnet=172.39.0.0/24 servarr-network
-docker network create --driver bridge --subnet=172.40.0.0/24 streamarr-network
+# Docker Compose will automatically create the required networks
+# Start download & management stack
+docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
+
+# Wait for VPN connection (2-3 minutes), then start streaming stack
+docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
 ```
 
 #### **4. Configure Environment Files**
@@ -338,6 +341,19 @@ docker exec qbittorrent curl -s ifconfig.me
 
 # Manual backup of critical configs
 tar -czf backup-$(date +%Y%m%d).tar.gz /volume1/docker/
+```
+
+### Uninstalling
+```bash
+# Complete removal of all stack components
+./scripts/uninstall.sh
+
+# This will remove:
+# - All containers and services
+# - Docker networks (servarr-network, streamarr-network)
+# - Generated environment files (.env-servarr, .env-streamarr)
+# - Backup files created by the setup script
+# - Preserves your media data and project files
 ```
 
 ## 🛠️ Platform-Specific Notes

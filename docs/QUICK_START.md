@@ -48,11 +48,14 @@ New-Item -ItemType Directory -Path "C:\homelab-media-stack\data\media\movies" -F
 New-Item -ItemType Directory -Path "C:\homelab-media-stack\data\media\tv" -Force
 New-Item -ItemType Directory -Path "C:\homelab-media-stack\data\media\music" -Force
 New-Item -ItemType Directory -Path "C:\homelab-media-stack\data\plex_transcode" -Force
-Step 3: Create Docker Networks
+Step 3: Deploy the Stacks
 bash
-# Create isolated networks for security
-docker network create --driver bridge --subnet=172.39.0.0/24 servarr-network
-docker network create --driver bridge --subnet=172.40.0.0/24 streamarr-network
+# Docker Compose will automatically create the required networks
+# Start download & management stack
+docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
+
+# Wait for VPN connection (2-3 minutes), then start streaming stack
+docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
 Step 4: Configure Environment Files
 Copy Example Files:
 bash
@@ -110,19 +113,12 @@ QNAP	/share	1000:1000
 Unraid	/mnt/user	99:100
 Windows	C:\homelab-media-stack	1000:1000
 Linux	/home/user/media-stack	Your user ID
-Step 5: Deploy the Stacks
-Start Download & Management Stack:
-bash
-docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
+Step 5: Verify Deployment
 Verify VPN Connection (CRITICAL):
 bash
 # Wait 2-3 minutes for VPN to connect, then check:
 docker logs gluetun | grep "You are running"
 # Should show: "You are running with the external IP address of XXX.XXX.XXX.XXX"
-Start Streaming & Request Stack:
-bash
-# Only proceed after VPN is confirmed working
-docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
 Step 6: Verify Everything is Running
 bash
 # Check all containers are up

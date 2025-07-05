@@ -628,26 +628,111 @@ create_docker_networks() {
     printf '\n%b\n' " ${uyc} Creating Docker networks..."
     show_loading_message "Setting up network isolation" 1
     
-    # Create networks if they don't exist
-    if ! docker network ls | grep -q "servarr-network"; then
-        if docker network create --driver bridge --subnet=172.39.0.0/24 servarr-network > /dev/null 2>&1; then
-            printf '\n%b\n' " ${utick} Created servarr-network (172.39.0.0/24)"
+    # Function to check if network was created by Docker Compose
+    check_compose_network() {
+        local network_name="$1"
+        docker network inspect "$network_name" 2>/dev/null | grep -q '"com.docker.compose.network": "'"$network_name"'"'
+    }
+    
+    # Arrays to store conflicting networks
+    declare -a conflicting_networks=()
+    declare -a existing_networks=()
+    declare -A network_containers
+    
+    # Check servarr-network
+    if docker network ls | grep -q "servarr-network"; then
+        if check_compose_network "servarr-network"; then
+            printf '\n%b\n' " ${utick} servarr-network already exists (created by Docker Compose)"
         else
-            printf '\n%b\n' " ${ucross} Failed to create servarr-network"
+            conflicting_networks+=("servarr-network")
+            # Get containers attached
+            containers=$(docker network inspect servarr-network --format '{{range $k,$v := .Containers}}{{$k}} {{end}}')
+            network_containers["servarr-network"]="$containers"
         fi
     else
-        printf '\n%b\n' " ${uyc} servarr-network already exists"
+        existing_networks+=("servarr-network")
     fi
     
-    if ! docker network ls | grep -q "streamarr-network"; then
-        if docker network create --driver bridge --subnet=172.40.0.0/24 streamarr-network > /dev/null 2>&1; then
-            printf '\n%b\n' " ${utick} Created streamarr-network (172.40.0.0/24)"
+    # Check streamarr-network
+    if docker network ls | grep -q "streamarr-network"; then
+        if check_compose_network "streamarr-network"; then
+            printf '\n%b\n' " ${utick} streamarr-network already exists (created by Docker Compose)"
         else
-            printf '\n%b\n' " ${ucross} Failed to create streamarr-network"
+            conflicting_networks+=("streamarr-network")
+            containers=$(docker network inspect streamarr-network --format '{{range $k,$v := .Containers}}{{$k}} {{end}}')
+            network_containers["streamarr-network"]="$containers"
         fi
     else
-        printf '\n%b\n' " ${uyc} streamarr-network already exists"
+        existing_networks+=("streamarr-network")
     fi
+    
+    # Handle conflicting networks
+    if [[ ${#conflicting_networks[@]} -gt 0 ]]; then
+        printf '\n%b\n' " ${cy}⚠️  NETWORK CONFLICTS DETECTED:${cend}"
+        printf '\n%b\n' " ${uyc} The following networks exist but were not created by Docker Compose:"
+        for network in "${conflicting_networks[@]}"; do
+            printf '\n%b\n' " ${clc}•${cend} ${network}"
+        done
+        printf '\n%b\n' " ${cy}⚠️  WARNING:${cend} These networks may be used by other containers."
+        
+        for network in "${conflicting_networks[@]}"; do
+            containers="${network_containers[$network]}"
+            if [[ -z "$containers" ]]; then
+                printf '\n%b\n' " ${uyc} No containers are attached to ${network}. Removing automatically..."
+                if docker network rm "$network" > /dev/null 2>&1; then
+                    printf '\n%b\n' " ${utick} Removed ${network}"
+                    existing_networks+=("$network")
+                else
+                    printf '\n%b\n' " ${ucross} Failed to remove ${network}"
+                    printf '\n%b\n' " ${uyc} Try: ${clc}docker network rm ${network}${cend} manually."
+                    return 1
+                fi
+            else
+                printf '\n%b\n' " ${cy}⚠️  Containers attached to ${network}:${cend}"
+                for c in $containers; do
+                    printf '\n%b\n' "   - $c"
+                done
+                printf '\n%b' " ${uyc} Remove ${network} and disconnect these containers? [y/N]: "
+                read -r remove_network
+                if [[ "$remove_network" =~ ^[Yy]$ ]]; then
+                    if docker network rm "$network" > /dev/null 2>&1; then
+                        printf '\n%b\n' " ${utick} Removed ${network}"
+                        existing_networks+=("$network")
+                    else
+                        printf '\n%b\n' " ${ucross} Failed to remove ${network}"
+                        printf '\n%b\n' " ${uyc} Try: ${clc}docker network disconnect ${network} <container_name>${cend} manually."
+                        return 1
+                    fi
+                else
+                    printf '\n%b\n' " ${uyc} Skipping network setup for ${network}. You may need to handle this manually."
+                    printf '\n%b\n' " ${uyc} Consider running: ${clc}docker network rm ${network}${cend} manually."
+                    return 1
+                fi
+            fi
+        done
+    fi
+    
+    # Create networks that don't exist
+    for network in "${existing_networks[@]}"; do
+        case "$network" in
+            "servarr-network")
+                if docker network create --driver bridge --subnet=172.39.0.0/24 servarr-network > /dev/null 2>&1; then
+                    printf '\n%b\n' " ${utick} Created servarr-network (172.39.0.0/24)"
+                else
+                    printf '\n%b\n' " ${ucross} Failed to create servarr-network"
+                    return 1
+                fi
+                ;;
+            "streamarr-network")
+                if docker network create --driver bridge --subnet=172.40.0.0/24 streamarr-network > /dev/null 2>&1; then
+                    printf '\n%b\n' " ${utick} Created streamarr-network (172.40.0.0/24)"
+                else
+                    printf '\n%b\n' " ${ucross} Failed to create streamarr-network"
+                    return 1
+                fi
+                ;;
+        esac
+    done
     
     printf '\n%b\n' " ${utick} Docker networks ready!"
 }
@@ -758,8 +843,8 @@ deploy_stacks() {
 show_access_info() {
     printf '\n%b\n' "${clg}
 ╔═══════════════════════════════════════════════════════════════════════════════╗
-║                             SETUP COMPLETE!                                  ║
-║                        Access your services below:                           ║
+║                             SETUP COMPLETE!                                   ║
+║                        Access your services below:                            ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
     
     printf '\n%b\n' " ${clc}🏠 Homarr Dashboard:${cend} http://${local_ip}:7575"
@@ -876,8 +961,9 @@ main() {
     # Create directory structure
     create_directories_for_platform
     
-    # Create Docker networks
-    create_docker_networks
+    # Docker Compose will create networks automatically
+    printf '\n%b\n' " ${uyc} Docker Compose will create networks automatically..."
+    show_loading_message "Networks will be created by Docker Compose" 1
     
     # Configure environment files
     configure_environment_files

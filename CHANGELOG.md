@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Universal Setup Script** (`scripts/setup.sh`) - Cross-platform automated setup with platform detection
+- **Uninstall Script** (`scripts/uninstall.sh`) - Complete cleanup and removal of all stack components
+- **Enhanced Network Management** - Docker Compose handles network creation automatically
+- **Beautiful UI Enhancements** - Colored output, progress bars, and loading animations in scripts
+- **Platform-Specific Optimizations** - Auto-detection for Windows, macOS, Linux, Synology, QNAP, Unraid, and more
+
+### Changed
+- **Network Creation** - Removed manual network creation steps, now handled by Docker Compose
+- **Setup Process** - Simplified manual setup by removing network creation requirements
+- **Documentation** - Updated all guides to reflect new network management approach
+- **Docker Compose Files** - Removed obsolete version fields and improved network definitions
+
+### Fixed
+- **Network Conflicts** - Resolved issues with leftover networks causing deployment failures
+- **Setup Script** - Enhanced conflict detection and resolution for existing networks
+- **Uninstall Process** - Comprehensive cleanup including Docker networks and generated files
+- **Platform Compatibility** - Improved detection and configuration for various NAS systems
+
 ### Planned
 - Platform-specific installation guides (Synology, Unraid, Proxmox)
 - Additional VPN provider configurations

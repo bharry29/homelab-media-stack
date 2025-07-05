@@ -132,6 +132,42 @@ wsl
 - **Config Only**: Environment files, Docker configs, scripts (~100MB)
 - **Full Backup**: Everything above + databases + metadata (~1-5GB)
 
+### 🗑️ `uninstall.sh`
+**Purpose**: Complete removal of all stack components and cleanup
+
+**Usage:**
+```bash
+# Interactive uninstall with safety prompts
+./scripts/uninstall.sh
+
+# Force uninstall without prompts (use with caution)
+./scripts/uninstall.sh --force
+
+# Dry run to see what would be removed
+./scripts/uninstall.sh --dry-run
+```
+
+**Features:**
+- ✅ **Complete cleanup** - Removes all containers, networks, and volumes
+- ✅ **Network removal** - Cleans up servarr-network and streamarr-network
+- ✅ **File cleanup** - Removes generated environment files and backups
+- ✅ **Data preservation** - Keeps your media files and project files safe
+- ✅ **Safety prompts** - Confirms actions before destructive operations
+- ✅ **Beautiful UI** - Colored output and progress indicators
+- ✅ **Conflict resolution** - Handles leftover networks and containers
+
+**What Gets Removed:**
+- **Containers**: All servarr and streamarr stack containers
+- **Networks**: servarr-network and streamarr-network (if unused)
+- **Volumes**: Docker volumes created by the stacks
+- **Files**: Generated .env-servarr and .env-streamarr files
+- **Backups**: Backup files created by setup script
+
+**What Gets Preserved:**
+- **Media Data**: Your movies, TV shows, music, and downloads
+- **Project Files**: Repository files and documentation
+- **User Configs**: Any custom configurations you've created
+
 ## 🔧 Manual Operations (No Scripts Needed)
 
 ### Container Updates
@@ -162,9 +198,8 @@ New-Item -ItemType Directory -Path "C:\homelab\data\downloads\complete" -Force
 
 ### Network Setup (Manual)
 ```bash
-# Create Docker networks
-docker network create --driver bridge --subnet=172.39.0.0/24 servarr-network
-docker network create --driver bridge --subnet=172.40.0.0/24 streamarr-network
+# Docker Compose automatically creates required networks
+# No manual network creation needed - networks are defined in docker-compose files
 ```
 
 ## 🎯 Why This Universal Approach?
