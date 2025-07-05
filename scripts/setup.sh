@@ -18,11 +18,93 @@ if [[ -t 1 ]]; then
     
     utick="\e[32m\U2714\e[0m" uplus="\e[36m\U002b\e[0m" ucross="\e[31m\U00D7\e[0m"
     uyc="\e[33m\U25cf\e[0m" urc="\e[31m\U25cf\e[0m" ugc="\e[32m\U25cf\e[0m"
+    
+    # Loading animation characters
+    spinner_chars=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+    spinner_colors=("\e[31m" "\e[33m" "\e[32m" "\e[36m" "\e[34m" "\e[35m")
+    progress_chars=("▰" "▱")
 else
     # No colors for non-terminal output
     cr="" clr="" cg="" clg="" cy="" cly="" cb="" clb="" cm="" clm="" cc="" clc="" cend=""
     utick="✓" uplus="+" ucross="✗" uyc="●" urc="●" ugc="●"
+    
+    # Loading animation characters (fallback)
+    spinner_chars=("|" "/" "-" "\\")
+    spinner_colors=("" "" "" "")
+    progress_chars=("#" "-")
 fi
+
+#################################################################################################################################################
+# Loading Animations and Progress Indicators
+#################################################################################################################################################
+show_spinner() {
+    local pid=$1
+    local delay=0.1
+    local spinstr='|/-\'
+    local i=0
+    
+    while kill -0 $pid 2>/dev/null; do
+        local temp=${spinstr#?}
+        printf " [%c]  " "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\b\b\b\b\b\b"
+    done
+    printf "    \b\b\b\b"
+}
+
+show_animated_spinner() {
+    local message="$1"
+    local duration="${2:-3}"
+    local i=0
+    local color_idx=0
+    
+    printf '%b' " ${uyc} ${message} "
+    
+    while [[ $i -lt $((duration * 10)) ]]; do
+        local spinner="${spinner_chars[$((i % ${#spinner_chars[@]}))]}"
+        local color="${spinner_colors[$((color_idx % ${#spinner_colors[@]}))]}"
+        printf '\b%b%s%b' "$color" "$spinner" "$cend"
+        sleep 0.1
+        ((i++))
+        if [[ $((i % 10)) -eq 0 ]]; then
+            ((color_idx++))
+        fi
+    done
+    printf '\b \b'
+}
+
+show_progress_bar() {
+    local current=$1
+    local total=$2
+    local width=50
+    local percentage=$((current * 100 / total))
+    local filled=$((width * current / total))
+    local empty=$((width - filled))
+    
+    printf '\r%b' " ${uyc} Progress: ["
+    
+    # Filled part
+    for ((i=0; i<filled; i++)); do
+        printf '%b%s%b' "${clg}" "${progress_chars[0]}" "$cend"
+    done
+    
+    # Empty part
+    for ((i=0; i<empty; i++)); do
+        printf '%s' "${progress_chars[1]}"
+    done
+    
+    printf '] %d%%' "$percentage"
+}
+
+show_loading_message() {
+    local message="$1"
+    local duration="${2:-2}"
+    
+    printf '%b' " ${uyc} ${message} "
+    show_animated_spinner "" "$duration"
+    printf '\n'
+}
 
 #################################################################################################################################################
 # Banner
@@ -44,6 +126,7 @@ show_banner() {
 #################################################################################################################################################
 detect_platform() {
     printf '\n%b\n' " ${uyc} Detecting your platform..."
+    show_loading_message "Analyzing system environment" 2
     
     # Automatic detection
     local detected=""
@@ -316,6 +399,7 @@ check_platform_prerequisites() {
 
 create_directories_for_platform() {
     printf '\n%b\n' " ${uyc} Creating directory structure for ${clc}${platform}${cend}..."
+    show_loading_message "Setting up directory structure" 1
     
     # Directory list
     directories=(
@@ -329,8 +413,14 @@ create_directories_for_platform() {
         "${base_path}/data/plex_transcode"
     )
     
-    # Create directories
+    # Create directories with progress
+    local total_dirs=${#directories[@]}
+    local current=0
+    
     for dir in "${directories[@]}"; do
+        ((current++))
+        show_progress_bar "$current" "$total_dirs"
+        
         if mkdir -p "$dir" 2>/dev/null; then
             printf '\n%b\n' " ${utick} Created: ${clc}${dir}${cend}"
         else
@@ -431,6 +521,7 @@ get_platform_network_info() {
 #################################################################################################################################################
 check_prerequisites() {
     printf '\n%b\n' " ${uyc} Checking system prerequisites..."
+    show_loading_message "Verifying Docker installation" 1
     
     # Check Docker
     if ! command -v docker &> /dev/null; then
@@ -535,6 +626,7 @@ show_compose_install_instructions() {
 #################################################################################################################################################
 create_docker_networks() {
     printf '\n%b\n' " ${uyc} Creating Docker networks..."
+    show_loading_message "Setting up network isolation" 1
     
     # Create networks if they don't exist
     if ! docker network ls | grep -q "servarr-network"; then
@@ -562,6 +654,7 @@ create_docker_networks() {
 
 configure_environment_files() {
     printf '\n%b\n' " ${uyc} Configuring environment files..."
+    show_loading_message "Configuring application settings" 1
     
     # Configure servarr environment
     if [[ ! -f ".env-servarr" ]]; then
@@ -624,9 +717,12 @@ configure_environment_files() {
 
 deploy_stacks() {
     printf '\n%b\n' " ${uyc} Deploying homelab media stack..."
+    show_loading_message "Preparing container deployment" 1
     
     # Deploy servarr stack
     printf '\n%b\n' " ${uyc} Starting SERVARR stack (download & management)..."
+    show_loading_message "Launching download services" 2
+    
     if $compose_cmd --env-file .env-servarr -f docker-compose-servarr.yml up -d; then
         printf '\n%b\n' " ${utick} SERVARR stack started successfully!"
     else
@@ -636,7 +732,7 @@ deploy_stacks() {
     
     # Wait for VPN to be ready
     printf '\n%b\n' " ${uyc} Waiting for VPN connection to establish (30 seconds)..."
-    sleep 30
+    show_loading_message "Establishing VPN connection" 3
     
     # Verify VPN (optional, don't fail if it doesn't work)
     if docker exec gluetun curl -s --max-time 10 ifconfig.me > /dev/null 2>&1; then
@@ -648,6 +744,8 @@ deploy_stacks() {
     
     # Deploy streamarr stack
     printf '\n%b\n' " ${uyc} Starting STREAMARR stack (streaming & requests)..."
+    show_loading_message "Launching streaming services" 2
+    
     if $compose_cmd --env-file .env-streamarr -f docker-compose-streamarr.yml up -d; then
         printf '\n%b\n' " ${utick} STREAMARR stack started successfully!"
         return 0
