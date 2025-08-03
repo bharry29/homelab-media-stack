@@ -97,7 +97,7 @@ show_banner() {
     printf '\n%b\n' "${cr}
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                        HOMELAB MEDIA STACK                                    ║
-║                     Universal Uninstall Script v1.0                           ║
+║                     Universal Uninstall Script v2.0                           ║
 ║                                                                               ║
 ║  Supports: Windows • macOS • Linux • Synology • UGREEN • QNAP                 ║
 ║           TrueNAS • Unraid • Proxmox • And More!                              ║

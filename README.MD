@@ -166,18 +166,19 @@ Please confirm or select your platform:
 ✓ .env-streamarr configured
 
 🌐 Checking Docker networks...
-⚠️  Found existing network: servarr-network
-   Checking if network is in use...
-   Network is unused, removing...
-✓ Network conflicts resolved
+⚠️  NETWORK CONFLICTS DETECTED:
+   The following networks exist but were not created by Docker Compose:
+   • servarr-network
+   No containers are attached to servarr-network. Removing automatically...
+✓ Removed servarr-network
+✓ Docker networks ready!
 
 🚀 Deploying servarr stack...
 [████████████████████] 100% Complete
 ✓ All servarr services started successfully
 
-🛡️ Validating VPN protection...
-✓ VPN connection established
-✓ Download traffic protected
+🛡️ Waiting for VPN connection to establish (30 seconds)...
+✓ VPN is working! External IP: 185.xxx.xxx.xxx
 
 🚀 Deploying streamarr stack...
 [████████████████████] 100% Complete
@@ -193,14 +194,14 @@ Please confirm or select your platform:
 🎥 Radarr:              http://192.168.1.100:7878
 📊 Tautulli:            http://192.168.1.100:8181
 
-Next steps:
-1. Access Homarr Dashboard for service overview
-2. Configure qBittorrent password and download paths
-3. Set up Plex libraries and hardware transcoding
-4. Add indexers in Prowlarr
-5. Configure Overseerr for request management
+Next Steps:
+1. Configure your VPN settings in .env-servarr
+2. Set up download clients in Sonarr/Radarr
+3. Add indexers in Prowlarr
+4. Configure Plex libraries
+5. Set up Overseerr for requests
 
-Need help? Check docs/QUICK_START.md for detailed configuration steps.
+For detailed configuration guide: docs/QUICK_START.md
 ```
 
 ---
@@ -456,7 +457,7 @@ tar -czf backup-$(date +%Y%m%d).tar.gz /volume1/docker/
 ✓ .env-streamarr removed
 ✓ Backup files cleaned up
 
-🎉 Uninstall Complete!
+🎉 DOCKER UNINSTALL COMPLETE!
    Your media data and project files have been preserved.
    To reinstall, simply run: ./scripts/setup.sh
 ```
