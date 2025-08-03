@@ -602,7 +602,138 @@ Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTIN
 - **Documentation improvements** and translations
 - **Security enhancements** and best practices
 
-## 🆘 Support
+## 🆘 Support & Troubleshooting
+
+### **🔧 Quick Diagnosis**
+
+If you encounter issues with the setup or uninstall scripts, run these quick checks:
+
+```bash
+# Check bash version (should be 4.0+)
+bash --version
+
+# Check if script is readable
+cat scripts/setup.sh | head -5
+
+# Check script syntax
+bash -n scripts/setup.sh
+
+# Check file permissions
+ls -la scripts/setup.sh
+```
+
+### **🚨 Common Script Issues**
+
+#### **Script Not Executing (Permission Denied)**
+```bash
+# Fix permissions
+chmod +x scripts/setup.sh scripts/uninstall.sh
+
+# On Windows (Git Bash/WSL)
+dos2unix scripts/setup.sh scripts/uninstall.sh
+```
+
+#### **Script Fails with Sudo**
+```bash
+# Check if running as root
+whoami
+
+# Ensure proper sudo access
+sudo -l
+
+# Try running with explicit bash
+sudo bash scripts/setup.sh
+```
+
+#### **Line Ending Issues (Windows)**
+```bash
+# Convert Windows line endings to Unix
+dos2unix scripts/setup.sh scripts/uninstall.sh
+
+# Alternative using sed
+sed -i 's/\r$//' scripts/setup.sh scripts/uninstall.sh
+
+# Alternative using tr
+tr -d '\r' < scripts/setup.sh > setup_fixed.sh && mv setup_fixed.sh scripts/setup.sh
+```
+
+#### **Docker Network Conflicts**
+```bash
+# Remove conflicting networks (if no containers are using them)
+docker network rm servarr-network streamarr-network
+
+# Check network status
+docker network ls
+
+# Recreate networks manually
+docker network create --driver bridge --subnet=172.39.0.0/24 servarr-network
+docker network create --driver bridge --subnet=172.40.0.0/24 streamarr-network
+```
+
+#### **VPN Connection Issues**
+```bash
+# Check VPN container status
+docker logs gluetun
+
+# Test VPN connection
+docker exec qbittorrent curl -s ifconfig.me
+
+# Restart VPN container
+docker restart gluetun
+```
+
+### **🔍 Detailed Troubleshooting**
+
+#### **Setup Script Issues**
+- **Platform Detection Fails**: Check if your system is in the supported list
+- **Permission Errors**: Ensure you're running with `sudo` and have proper file permissions
+- **Docker Not Found**: Install Docker and Docker Compose first
+- **Directory Creation Fails**: Check disk space and parent directory permissions
+
+#### **Uninstall Script Issues**
+- **Containers Won't Stop**: Force stop with `docker stop $(docker ps -q)`
+- **Networks Won't Remove**: Check if containers are still attached
+- **Files Won't Delete**: Check file permissions and ownership
+
+#### **Service Access Issues**
+- **Port Already in Use**: Check what's using the port: `netstat -tulpn | grep :8080`
+- **Firewall Blocking**: Configure firewall to allow Docker ports
+- **Wrong IP Address**: Use `ip addr show` to find correct server IP
+
+### **📋 Error Messages & Solutions**
+
+| Error | Solution |
+|-------|----------|
+| `Permission denied` | Run with `sudo` or fix file permissions |
+| `No such file or directory` | Check if script exists and has correct line endings |
+| `Network already exists` | Remove conflicting network or let Docker Compose handle it |
+| `Port already in use` | Stop conflicting service or change port in .env file |
+| `VPN connection failed` | Check credentials and provider settings |
+| `Container won't start` | Check logs: `docker logs container_name` |
+
+### **🛠️ Manual Recovery**
+
+If scripts fail completely, you can manually clean up:
+
+```bash
+# Stop all containers
+docker stop $(docker ps -aq)
+
+# Remove all containers
+docker rm $(docker ps -aq)
+
+# Remove networks
+docker network rm servarr-network streamarr-network
+
+# Remove generated files
+rm -f .env-servarr .env-streamarr
+
+# Remove empty directories (be careful!)
+find /volume1/docker -type d -empty -delete
+find /volume1/data -type d -empty -delete
+```
+
+### **📞 Getting Help**
 
 - **🔧 Setup Issues**: Use the automated setup script or check [Troubleshooting Guide](docs/TROUBLESHOOTING.md)
 - **📖 Documentation**: Check the [docs/](docs/) directory

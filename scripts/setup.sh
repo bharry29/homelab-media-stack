@@ -139,6 +139,12 @@ detect_platform() {
     printf '\n%b\n' " ${uyc} Detecting your platform..."
     show_loading_message "Analyzing system environment" 2
     
+    # Make variables global so they can be accessed by main function
+    declare -g platform
+    declare -g default_base_path
+    declare -g puid
+    declare -g pgid
+    
     # Automatic detection
     local detected=""
     local auto_path=""
@@ -1016,6 +1022,7 @@ show_vpn_warning() {
 cleanup_failed_installation() {
     local base_path="$1"
     local error_stage="$2"
+    local compose_cmd="${3:-docker-compose}"
     
     printf '\n%b\n' "${clr}
 ╔═══════════════════════════════════════════════════════════════════════════════╗
@@ -1154,18 +1161,24 @@ main() {
     
     # Initialize variables
     local base_path=""
-    local platform=""
     local compose_cmd=""
+    
+    # Determine Docker Compose command
+    if command -v docker-compose &> /dev/null; then
+        compose_cmd="docker-compose"
+    else
+        compose_cmd="docker compose"
+    fi
     
     # Detect and select platform
     if ! detect_platform; then
-        cleanup_failed_installation "$base_path" "platform detection"
+        cleanup_failed_installation "$base_path" "platform detection" "$compose_cmd"
         exit 1
     fi
     
     # Check platform-specific prerequisites
     if ! check_platform_prerequisites; then
-        cleanup_failed_installation "$base_path" "platform prerequisites check"
+        cleanup_failed_installation "$base_path" "platform prerequisites check" "$compose_cmd"
         exit 1
     fi
     
@@ -1178,19 +1191,19 @@ main() {
     
     # Get network information
     if ! get_platform_network_info; then
-        cleanup_failed_installation "$base_path" "network information detection"
+        cleanup_failed_installation "$base_path" "network information detection" "$compose_cmd"
         exit 1
     fi
     
     # Check prerequisites
     if ! check_prerequisites; then
-        cleanup_failed_installation "$base_path" "prerequisites check"
+        cleanup_failed_installation "$base_path" "prerequisites check" "$compose_cmd"
         exit 1
     fi
     
     # Create directory structure
     if ! create_directories_for_platform; then
-        cleanup_failed_installation "$base_path" "directory creation"
+        cleanup_failed_installation "$base_path" "directory creation" "$compose_cmd"
         exit 1
     fi
     
@@ -1200,7 +1213,7 @@ main() {
     
     # Configure environment files
     if ! configure_environment_files; then
-        cleanup_failed_installation "$base_path" "environment file configuration"
+        cleanup_failed_installation "$base_path" "environment file configuration" "$compose_cmd"
         exit 1
     fi
     
@@ -1220,7 +1233,7 @@ main() {
             show_access_info
         else
             printf '\n%b\n' " ${ucross} Deployment failed. Check the errors above."
-            cleanup_failed_installation "$base_path" "container deployment"
+            cleanup_failed_installation "$base_path" "container deployment" "$compose_cmd"
             printf '\n%b\n' " ${uyc} You can try deploying manually using:"
             printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-servarr -f docker-compose-servarr.yml up -d${cend}"
             printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-streamarr -f docker-compose-streamarr.yml up -d${cend}"
