@@ -441,7 +441,7 @@ services:
       -non-strict
       --log-file /data/amc.log
       --def excludeList=/data/amc-exclude-list.txt
-      --def unsorted=y music=y artwork=y clean=y movieDB=TheMovieDB seriesDB=TheMovieDB::TV animeDB=TheMovieDB::TV musicDB=ID3 movieFormat="/media_data_path/{height > 2000 ? 'Upscaled Movies' : 'Movies'}/{info.OriginalLanguage}/{~plex}" animeFormat="/media_data_path/Anime/{info.OriginalLanguage}/{~plex}" seriesFormat="/media_data_path/TV Shows/{info.OriginalLanguage}/{~plex}" unsortedFormat="/media_data_path/Unsorted" "ut_label=%L" "ut_title=%N" "ut_kind=multi" "ut_dir=%F"
+      --def unsorted=y music=y artwork=y clean=y movieDB=TheMovieDB seriesDB=TheMovieDB::TV animeDB=TheMovieDB::TV musicDB=ID3 movieFormat="/media_data_path/Movies/{hd ==~ /UHD|QHD/ ? "UHD" : hd ==~ /FHD|HD/ ? "HD" : "SD"}/{info.OriginalLanguage}/{~plex}" animeFormat="/media_data_path/Anime/{info.OriginalLanguage}/{~plex}" seriesFormat="/media_data_path/TV Shows/{info.OriginalLanguage}/{~plex}" unsortedFormat="/media_data_path/Unsorted/" "ut_label=%L" "ut_title=%N" "ut_kind=multi" "ut_dir=%F"
       --def plex=${PLEX_TOKEN}
       --def discord=${DISCORD_WEBHOOK}
     
