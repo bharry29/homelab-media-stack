@@ -56,6 +56,7 @@ This stack uses a **dual-stack architecture** with proper network isolation and 
 - **VPN Provider** account (NordVPN, Privado, etc.)
 - **Plex Account** (Plex Pass recommended for hardware transcoding)
 - **FileBot License** (optional, for advanced processing)
+- **Root/Sudo Access** (required for setup script)
 
 ### System Requirements
 
@@ -88,39 +89,41 @@ This stack uses a **dual-stack architecture** with proper network isolation and 
 git clone https://github.com/bharry29/homelab-media-stack.git
 cd homelab-media-stack
 
-# 2. Run the universal setup script
-./scripts/setup.sh
+# 2. Run the universal setup script (requires sudo)
+sudo ./scripts/setup.sh
 ```
 
 **That's it!** The script will:
 - 🔍 **Auto-detect your platform** (Windows, macOS, Linux, Synology, QNAP, Unraid, etc.)
-- ✅ **Check prerequisites** (Docker, Docker Compose)
+- ✅ **Check prerequisites** (Docker, Docker Compose, sudo access)
 - 📁 **Create all directories** with proper permissions
 - ⚙️ **Configure environment files** with your system settings
 - 🌐 **Handle Docker networks** automatically (no conflicts!)
-- 🚀 **Deploy both stacks** (optional)
+- 🔐 **Set up VPN protection** with interactive provider selection
+- 🚀 **Deploy both stacks** (SERVARR and STREAMARR) separately
 - 📊 **Show all service URLs** for easy access
 - 🛡️ **Validate VPN protection** and security
+- 🧹 **Automatic cleanup** on any failure (removes all created files)
 
 #### **💻 Platform-Specific Instructions**
 
 **Linux/macOS/NAS:**
 ```bash
 chmod +x scripts/setup.sh
-./scripts/setup.sh
+sudo ./scripts/setup.sh
 ```
 
 **Windows (choose one):**
 ```bash
 # Option 1: WSL2 (Recommended)
 wsl
-./scripts/setup.sh
+sudo ./scripts/setup.sh
 
 # Option 2: Git Bash
-./scripts/setup.sh
+sudo ./scripts/setup.sh
 
 # Option 3: PowerShell via WSL
-wsl --exec ./scripts/setup.sh
+wsl --exec sudo ./scripts/setup.sh
 ```
 
 #### **🎮 What You'll See**
@@ -129,7 +132,7 @@ The setup script provides a beautiful, interactive experience with colorful outp
 ```
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                          HOMELAB MEDIA STACK                                  ║
-║                       Universal Setup Script v2.0                             ║
+║                       Universal Setup Script v2.2                             ║
 ║  Supports: Windows • macOS • Linux • Synology • UGREEN • QNAP                 ║
 ║           TrueNAS • Unraid • Proxmox • And More!                              ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
@@ -165,41 +168,85 @@ Please confirm or select your platform:
 ✓ .env-servarr configured
 ✓ .env-streamarr configured
 
-🌐 Checking Docker networks...
-⚠️  NETWORK CONFLICTS DETECTED:
-   The following networks exist but were not created by Docker Compose:
-   • servarr-network
-   No containers are attached to servarr-network. Removing automatically...
-✓ Removed servarr-network
-✓ Docker networks ready!
+🔐 Configuring VPN settings for Gluetun...
 
-🚀 Deploying servarr stack...
+Select your VPN provider:
+1) NordVPN
+2) PrivadoVPN
+3) Private Internet Access (PIA)
+4) ExpressVPN
+5) Surfshark
+6) Other (manual configuration)
+7) Skip VPN setup (configure later)
+
+[?] Select VPN provider [1-7] (default: 7): 1
+● NordVPN selected
+
+Enter your VPN credentials:
+● VPN Username: your_nordvpn_username
+● VPN Password: [hidden input]
+● Preferred country (e.g., United States, Canada, Germany): United States
+
+✅ VPN settings configured in .env-servarr
+
+🚀 Ready to deploy the homelab media stack!
+[?] Deploy now? [Y/n]: 
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                        DEPLOYING SERVARR STACK                              ║
+║                    (Download & Management Services)                          ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
 [████████████████████] 100% Complete
-✓ All servarr services started successfully
+✅ SERVARR stack deployed successfully!
+● Services: Gluetun (VPN), qBittorrent, SABnzbd, Prowlarr, Sonarr, Radarr, Lidarr, Bazarr, FileBot, Homarr
 
 🛡️ Waiting for VPN connection to establish (30 seconds)...
 ✓ VPN is working! External IP: 185.xxx.xxx.xxx
 
-🚀 Deploying streamarr stack...
-[████████████████████] 100% Complete
-✓ All streamarr services started successfully
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                       DEPLOYING STREAMARR STACK                             ║
+║                    (Streaming & Request Services)                            ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
 
-🎉 Setup Complete! Your services are ready:
+[████████████████████] 100% Complete
+✅ STREAMARR stack deployed successfully!
+● Services: Plex Media Server, Overseerr, Tautulli, ErsatzTV
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                             SETUP COMPLETE!                                   ║
+║                        Access your services below:                            ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                        SERVARR STACK (Download & Management)                 ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
 
 🏠 Homarr Dashboard:     http://192.168.1.100:7575
 ⬇️ qBittorrent:         http://192.168.1.100:8080
-🎬 Plex Media Server:   http://192.168.1.100:32400/web
-📱 Overseerr:           http://192.168.1.100:5055
+📋 SABnzbd:             http://192.168.1.100:8090
+🔍 Prowlarr:            http://192.168.1.100:9696
 📺 Sonarr:              http://192.168.1.100:8989
 🎥 Radarr:              http://192.168.1.100:7878
+🎵 Lidarr:              http://192.168.1.100:8686
+💬 Bazarr:              http://192.168.1.100:6767
+🗂️ FileBot:             http://192.168.1.100:5452
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                       STREAMARR STACK (Streaming & Requests)                 ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+🎬 Plex Media Server:   http://192.168.1.100:32400/web
+📱 Overseerr:           http://192.168.1.100:5055
 📊 Tautulli:            http://192.168.1.100:8181
+📺 ErsatzTV:            http://192.168.1.100:8409
 
 Next Steps:
-1. Configure your VPN settings in .env-servarr
-2. Set up download clients in Sonarr/Radarr
-3. Add indexers in Prowlarr
-4. Configure Plex libraries
-5. Set up Overseerr for requests
+1. Set up download clients in Sonarr/Radarr
+2. Add indexers in Prowlarr
+3. Configure Plex libraries
+4. Set up Overseerr for requests
+5. Configure FileBot for media organization
 
 For detailed configuration guide: docs/QUICK_START.md
 ```
@@ -412,7 +459,7 @@ tar -czf backup-$(date +%Y%m%d).tar.gz /volume1/docker/
 # - All containers and services
 # - Docker networks (servarr-network, streamarr-network)
 # - Generated environment files (.env-servarr, .env-streamarr)
-# - Backup files created by the setup script
+# - Empty directories created during setup
 # - Preserves your media data and project files
 ```
 
@@ -420,7 +467,7 @@ tar -czf backup-$(date +%Y%m%d).tar.gz /volume1/docker/
 ```
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                          HOMELAB MEDIA STACK                                  ║
-║                        Uninstall Script v2.0                                  ║
+║                        Uninstall Script v2.1                                  ║
 ║                    Complete Cleanup & Removal                                 ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 
@@ -431,7 +478,7 @@ tar -czf backup-$(date +%Y%m%d).tar.gz /volume1/docker/
    • All Docker containers and services
    • Docker networks (servarr-network, streamarr-network)
    • Generated environment files (.env-servarr, .env-streamarr)
-   • Backup files created during setup
+   • Empty directories created during setup
 
    What will be preserved:
    • Your media files (movies, TV shows, music)
@@ -455,11 +502,11 @@ tar -czf backup-$(date +%Y%m%d).tar.gz /volume1/docker/
 📁 Cleaning up files...
 ✓ .env-servarr removed
 ✓ .env-streamarr removed
-✓ Backup files cleaned up
+✓ Empty directories removed
 
 🎉 DOCKER UNINSTALL COMPLETE!
    Your media data and project files have been preserved.
-   To reinstall, simply run: ./scripts/setup.sh
+   To reinstall, simply run: sudo ./scripts/setup.sh
 ```
 
 ## 🛠️ Platform-Specific Notes
@@ -514,6 +561,10 @@ tar -czf backup-$(date +%Y%m%d).tar.gz /volume1/docker/
 - **🎨 Beautiful UI**: Colored output and progress animations in all scripts
 - **🔧 Conflict Resolution**: Automatic handling of Docker network conflicts
 - **📋 Comprehensive Documentation**: Complete guides for all skill levels
+- **🔐 Integrated VPN Setup**: Interactive VPN provider selection and configuration
+- **🧹 Automatic Cleanup**: Comprehensive rollback on failed installations
+- **⚡ Default Options**: Streamlined experience with sensible defaults
+- **🛡️ Sudo Requirement**: Proper permissions for secure installation
 
 ## 🌟 Why Choose This Stack?
 
@@ -522,18 +573,21 @@ tar -czf backup-$(date +%Y%m%d).tar.gz /volume1/docker/
 - **🔍 Auto-detection** handles platform-specific configurations
 - **📚 Comprehensive documentation** guides you through everything
 - **🛡️ Security by default** with VPN protection built-in
+- **🔐 Integrated VPN setup** with provider selection
 
 ### **For Advanced Users:**
 - **🔧 Full manual control** over every aspect of the setup
 - **📋 Modular architecture** allows customization and extension
 - **🌐 Network isolation** for enterprise-grade security
 - **🔄 GitOps ready** with version-controlled configurations
+- **🧹 Automatic cleanup** on failures with comprehensive rollback
 
 ### **For Everyone:**
 - **🌍 Universal compatibility** across all major platforms
 - **🚀 Production-ready** with enterprise-grade features
 - **💰 Cost-effective** using open-source components
 - **👥 Active community** support and contributions
+- **🛡️ Security-first** approach with VPN integration
 
 > **💡 Want to understand the full impact?** Read our [Community Impact & Project Value](docs/COMMUNITY_IMPACT.md) analysis to see why this project is transforming the self-hosted media landscape.
 

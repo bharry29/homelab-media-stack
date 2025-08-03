@@ -97,7 +97,7 @@ show_banner() {
     printf '\n%b\n' "${cr}
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                        HOMELAB MEDIA STACK                                    ║
-║                     Universal Uninstall Script v2.0                           ║
+║                     Universal Uninstall Script v2.1                           ║
 ║                                                                               ║
 ║  Supports: Windows • macOS • Linux • Synology • UGREEN • QNAP                 ║
 ║           TrueNAS • Unraid • Proxmox • And More!                              ║
@@ -347,10 +347,10 @@ remove_docker_volumes() {
 #################################################################################################################################################
 # Remove directories and files
 #################################################################################################################################################
-remove_docker_files_only() {
+remove_docker_files_and_directories() {
     local base_path="$1"
-    printf '\n%b\n' " ${uyc} Removing Docker-related files only (preserving data)..."
-    show_loading_message "Cleaning up configuration files" 1
+    printf '\n%b\n' " ${uyc} Removing Docker-related files and empty directories..."
+    show_loading_message "Cleaning up configuration files and directories" 1
     
     # Change to the installation directory
     cd "$base_path" || {
@@ -390,8 +390,56 @@ remove_docker_files_only() {
         fi
     done
     
-    printf '\n%b\n' " ${utick} Generated environment files removed!"
-    printf '\n%b\n' " ${ugc} Your data directories are preserved:"
+    # Remove empty directories created during setup
+    printf '\n%b\n' " ${uyc} Checking for empty directories to remove..."
+    
+    # List of directories that might have been created during setup
+    local created_dirs=(
+        "${base_path}/docker/servarr"
+        "${base_path}/docker/streamarr"
+        "${base_path}/data/downloads/complete"
+        "${base_path}/data/downloads/incomplete"
+        "${base_path}/data/media/movies"
+        "${base_path}/data/media/tv"
+        "${base_path}/data/media/music"
+        "${base_path}/data/plex_transcode"
+    )
+    
+    # Remove empty directories (in reverse order to handle nested dirs)
+    for ((i=${#created_dirs[@]}-1; i>=0; i--)); do
+        local dir="${created_dirs[$i]}"
+        if [[ -d "$dir" ]] && [[ -z "$(ls -A "$dir" 2>/dev/null)" ]]; then
+            if rmdir "$dir" 2>/dev/null; then
+                printf '\n%b\n' " ${utick} Removed empty directory: ${clc}${dir}${cend}"
+            fi
+        else
+            printf '\n%b\n' " ${ugc} Preserved directory (not empty): ${clc}${dir}${cend}"
+        fi
+    done
+    
+    # Try to remove the main docker directory if empty
+    if [[ -d "${base_path}/docker" ]] && [[ -z "$(ls -A "${base_path}/docker" 2>/dev/null)" ]]; then
+        if rmdir "${base_path}/docker" 2>/dev/null; then
+            printf '\n%b\n' " ${utick} Removed empty docker directory: ${clc}${base_path}/docker${cend}"
+        fi
+    fi
+    
+    # Try to remove the main data directory if empty
+    if [[ -d "${base_path}/data" ]] && [[ -z "$(ls -A "${base_path}/data" 2>/dev/null)" ]]; then
+        if rmdir "${base_path}/data" 2>/dev/null; then
+            printf '\n%b\n' " ${utick} Removed empty data directory: ${clc}${base_path}/data${cend}"
+        fi
+    fi
+    
+    # Try to remove the base path if completely empty
+    if [[ -d "$base_path" ]] && [[ -z "$(ls -A "$base_path" 2>/dev/null)" ]]; then
+        if rmdir "$base_path" 2>/dev/null; then
+            printf '\n%b\n' " ${utick} Removed empty base directory: ${clc}${base_path}${cend}"
+        fi
+    fi
+    
+    printf '\n%b\n' " ${utick} Generated files and empty directories removed!"
+    printf '\n%b\n' " ${ugc} Your data directories with content are preserved:"
     printf '\n%b\n' " ${clc}•${cend} ${base_path}/data/downloads/complete"
     printf '\n%b\n' " ${clc}•${cend} ${base_path}/data/downloads/incomplete"
     printf '\n%b\n' " ${clc}•${cend} ${base_path}/data/media/movies"
@@ -508,8 +556,8 @@ main() {
         # Stop and remove containers
         stop_and_remove_containers "$installation"
         
-        # Remove Docker files only (preserve data)
-        remove_docker_files_only "$installation"
+        # Remove Docker files and empty directories (preserve data)
+        remove_docker_files_and_directories "$installation"
     done
     
     # Remove Docker networks (custom)
@@ -540,12 +588,14 @@ main() {
     printf '\n%b\n' " ${clc}•${cend} Docker networks (servarr-network, streamarr-network)"
     printf '\n%b\n' " ${clc}•${cend} Docker volumes (application data, databases)"
     printf '\n%b\n' " ${clc}•${cend} Generated environment files (.env-servarr, .env-streamarr)"
+    printf '\n%b\n' " ${clc}•${cend} Empty directories created during setup"
     
     printf '\n%b\n' " ${uyc} ${cy}What was preserved:${cend}"
     printf '\n%b\n' " ${clg}•${cend} All media files (movies, TV shows, music)"
-    printf '\n%b\n' " ${clg}•${cend} Download directories (complete, incomplete)"
+    printf '\n%b\n' " ${clg}•${cend} Download directories with content (complete, incomplete)"
     printf '\n%b\n' " ${clg}•${cend} Plex transcode directory"
-    printf '\n%b\n' " ${clg}•${cend} All data directories and subdirectories"
+    printf '\n%b\n' " ${clg}•${cend} All data directories with content"
+    printf '\n%b\n' " ${clg}•${cend} Original project files (docker-compose-*.yml, .env-*.example)"
     
     printf '\n%b\n' " ${uyc} ${cy}Next steps:${cend}"
     printf '\n%b\n' " ${clc}•${cend} If you want to reinstall, run: ${clc}./scripts/setup.sh${cend}"

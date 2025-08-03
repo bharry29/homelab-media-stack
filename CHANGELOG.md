@@ -13,18 +13,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Enhanced Network Management** - Docker Compose handles network creation automatically
 - **Beautiful UI Enhancements** - Colored output, progress bars, and loading animations in scripts
 - **Platform-Specific Optimizations** - Auto-detection for Windows, macOS, Linux, Synology, QNAP, Unraid, and more
+- **Integrated VPN Configuration** - Interactive VPN setup during installation process
+- **Automatic Cleanup on Failure** - Comprehensive rollback functionality for failed installations
+- **Enhanced Error Handling** - Robust validation and error recovery throughout setup process
 
 ### Changed
 - **Network Creation** - Removed manual network creation steps, now handled by Docker Compose
 - **Setup Process** - Simplified manual setup by removing network creation requirements
 - **Documentation** - Updated all guides to reflect new network management approach
 - **Docker Compose Files** - Removed obsolete version fields and improved network definitions
+- **Setup Script** - Now requires sudo execution for proper permissions
+- **Default Options** - Most prompts now have sensible defaults for streamlined experience
+- **VPN Configuration** - Integrated directly into setup process with provider selection
+- **Stack Deployment** - Clear visual separation between SERVARR and STREAMARR deployments
 
 ### Fixed
 - **Network Conflicts** - Resolved issues with leftover networks causing deployment failures
 - **Setup Script** - Enhanced conflict detection and resolution for existing networks
 - **Uninstall Process** - Comprehensive cleanup including Docker networks and generated files
 - **Platform Compatibility** - Improved detection and configuration for various NAS systems
+- **VPN Validation** - Added proper input validation for VPN credentials
+- **File Permissions** - Enhanced error handling for file operations and permissions
+- **Directory Cleanup** - Improved cleanup of empty directories created during failed installations
+- **Error Recovery** - Automatic rollback of all changes when setup fails at any stage
 
 ### Planned
 - Platform-specific installation guides (Synology, Unraid, Proxmox)

@@ -5,6 +5,17 @@
 # Supports: Windows, macOS, Linux, Synology, UGREEN, QNAP, TrueNAS, Unraid, Proxmox
 
 #################################################################################################################################################
+# Sudo Check
+#################################################################################################################################################
+check_sudo() {
+    if [[ $EUID -ne 0 ]]; then
+        printf '\n%b\n' " ${ucross} This script must be run as root (sudo)"
+        printf '\n%b\n' " ${uyc} Please run: ${clc}sudo ./scripts/setup.sh${cend}"
+        exit 1
+    fi
+}
+
+#################################################################################################################################################
 # Color definitions
 #################################################################################################################################################
 if [[ -t 1 ]]; then
@@ -113,7 +124,7 @@ show_banner() {
     printf '\n%b\n' "${cb}
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                          HOMELAB MEDIA STACK                                  ║
-║                       Universal Setup Script v2.0                             ║
+║                     Universal Setup Script v2.2                               ║
 ║                                                                               ║
 ║  Supports: Windows • macOS • Linux • Synology • UGREEN • QNAP                 ║
 ║           TrueNAS • Unraid • Proxmox • And More!                              ║
@@ -216,12 +227,13 @@ detect_platform() {
         
         read -r choice
         
-        # Use detected platform if user just presses enter
+        # Use detected platform if user just presses enter (default behavior)
         if [[ -z "$choice" && -n "$detected" ]]; then
             platform="$detected"
             default_base_path="$auto_path"
             puid="$auto_puid"
             pgid="$auto_pgid"
+            printf '\n%b\n' " ${utick} Using detected platform: ${clc}${platform}${cend}"
             break
         fi
         
@@ -624,117 +636,177 @@ show_compose_install_instructions() {
 #################################################################################################################################################
 # Main setup functions
 #################################################################################################################################################
-create_docker_networks() {
-    printf '\n%b\n' " ${uyc} Creating Docker networks..."
-    show_loading_message "Setting up network isolation" 1
+
+configure_vpn_settings() {
+    printf '\n%b\n' " ${uyc} Configuring VPN settings for Gluetun..."
+    show_loading_message "Setting up VPN configuration" 1
     
-    # Function to check if network was created by Docker Compose
-    check_compose_network() {
-        local network_name="$1"
-        docker network inspect "$network_name" 2>/dev/null | grep -q '"com.docker.compose.network": "'"$network_name"'"'
-    }
+    # VPN Provider Selection
+    printf '\n%b\n' " ${cy}Select your VPN provider:${cend}"
+    printf '\n%b\n' " ${clc}1)${cend} NordVPN"
+    printf '\n%b\n' " ${clc}2)${cend} PrivadoVPN"
+    printf '\n%b\n' " ${clc}3)${cend} Private Internet Access (PIA)"
+    printf '\n%b\n' " ${clc}4)${cend} ExpressVPN"
+    printf '\n%b\n' " ${clc}5)${cend} Surfshark"
+    printf '\n%b\n' " ${clc}6)${cend} Other (manual configuration)"
+    printf '\n%b\n' " ${clc}7)${cend} Skip VPN setup (configure later)"
     
-    # Arrays to store conflicting networks
-    declare -a conflicting_networks=()
-    declare -a existing_networks=()
-    declare -A network_containers
-    
-    # Check servarr-network
-    if docker network ls | grep -q "servarr-network"; then
-        if check_compose_network "servarr-network"; then
-            printf '\n%b\n' " ${utick} servarr-network already exists (created by Docker Compose)"
-        else
-            conflicting_networks+=("servarr-network")
-            # Get containers attached
-            containers=$(docker network inspect servarr-network --format '{{range $k,$v := .Containers}}{{$k}} {{end}}')
-            network_containers["servarr-network"]="$containers"
-        fi
-    else
-        existing_networks+=("servarr-network")
-    fi
-    
-    # Check streamarr-network
-    if docker network ls | grep -q "streamarr-network"; then
-        if check_compose_network "streamarr-network"; then
-            printf '\n%b\n' " ${utick} streamarr-network already exists (created by Docker Compose)"
-        else
-            conflicting_networks+=("streamarr-network")
-            containers=$(docker network inspect streamarr-network --format '{{range $k,$v := .Containers}}{{$k}} {{end}}')
-            network_containers["streamarr-network"]="$containers"
-        fi
-    else
-        existing_networks+=("streamarr-network")
-    fi
-    
-    # Handle conflicting networks
-    if [[ ${#conflicting_networks[@]} -gt 0 ]]; then
-        printf '\n%b\n' " ${cy}⚠️  NETWORK CONFLICTS DETECTED:${cend}"
-        printf '\n%b\n' " ${uyc} The following networks exist but were not created by Docker Compose:"
-        for network in "${conflicting_networks[@]}"; do
-            printf '\n%b\n' " ${clc}•${cend} ${network}"
-        done
-        printf '\n%b\n' " ${cy}⚠️  WARNING:${cend} These networks may be used by other containers."
+    printf '\n'
+    while true; do
+        printf '%b' " ${uyc} Select VPN provider [1-7] (default: 7): "
+        read -r vpn_choice
+        vpn_choice="${vpn_choice:-7}"
         
-        for network in "${conflicting_networks[@]}"; do
-            containers="${network_containers[$network]}"
-            if [[ -z "$containers" ]]; then
-                printf '\n%b\n' " ${uyc} No containers are attached to ${network}. Removing automatically..."
-                if docker network rm "$network" > /dev/null 2>&1; then
-                    printf '\n%b\n' " ${utick} Removed ${network}"
-                    existing_networks+=("$network")
-                else
-                    printf '\n%b\n' " ${ucross} Failed to remove ${network}"
-                    printf '\n%b\n' " ${uyc} Try: ${clc}docker network rm ${network}${cend} manually."
-                    return 1
-                fi
-            else
-                printf '\n%b\n' " ${cy}⚠️  Containers attached to ${network}:${cend}"
-                for c in $containers; do
-                    printf '\n%b\n' "   - $c"
-                done
-                printf '\n%b' " ${uyc} Remove ${network} and disconnect these containers? [y/N]: "
-                read -r remove_network
-                if [[ "$remove_network" =~ ^[Yy]$ ]]; then
-                    if docker network rm "$network" > /dev/null 2>&1; then
-                        printf '\n%b\n' " ${utick} Removed ${network}"
-                        existing_networks+=("$network")
-                    else
-                        printf '\n%b\n' " ${ucross} Failed to remove ${network}"
-                        printf '\n%b\n' " ${uyc} Try: ${clc}docker network disconnect ${network} <container_name>${cend} manually."
-                        return 1
-                    fi
-                else
-                    printf '\n%b\n' " ${uyc} Skipping network setup for ${network}. You may need to handle this manually."
-                    printf '\n%b\n' " ${uyc} Consider running: ${clc}docker network rm ${network}${cend} manually."
-                    return 1
-                fi
-            fi
-        done
-    fi
-    
-    # Create networks that don't exist
-    for network in "${existing_networks[@]}"; do
-        case "$network" in
-            "servarr-network")
-                if docker network create --driver bridge --subnet=172.39.0.0/24 servarr-network > /dev/null 2>&1; then
-                    printf '\n%b\n' " ${utick} Created servarr-network (172.39.0.0/24)"
-                else
-                    printf '\n%b\n' " ${ucross} Failed to create servarr-network"
-                    return 1
-                fi
+        case "$vpn_choice" in
+            1)
+                vpn_provider="nordvpn"
+                printf '\n%b\n' " ${uyc} NordVPN selected"
+                break
                 ;;
-            "streamarr-network")
-                if docker network create --driver bridge --subnet=172.40.0.0/24 streamarr-network > /dev/null 2>&1; then
-                    printf '\n%b\n' " ${utick} Created streamarr-network (172.40.0.0/24)"
-                else
-                    printf '\n%b\n' " ${ucross} Failed to create streamarr-network"
-                    return 1
-                fi
+            2)
+                vpn_provider="privado"
+                printf '\n%b\n' " ${uyc} PrivadoVPN selected"
+                break
+                ;;
+            3)
+                vpn_provider="private internet access"
+                printf '\n%b\n' " ${uyc} Private Internet Access selected"
+                break
+                ;;
+            4)
+                vpn_provider="expressvpn"
+                printf '\n%b\n' " ${uyc} ExpressVPN selected"
+                break
+                ;;
+            5)
+                vpn_provider="surfshark"
+                printf '\n%b\n' " ${uyc} Surfshark selected"
+                break
+                ;;
+            6)
+                vpn_provider="custom"
+                printf '\n%b\n' " ${uyc} Custom VPN provider selected"
+                break
+                ;;
+            7)
+                vpn_provider=""
+                printf '\n%b\n' " ${uyc} Skipping VPN setup - configure manually later"
+                return 0
+                ;;
+            *)
+                printf '\n%b\n' " ${ucross} Invalid choice. Please select 1-7."
                 ;;
         esac
     done
     
-    printf '\n%b\n' " ${utick} Docker networks ready!"
+    if [[ -n "$vpn_provider" && "$vpn_provider" != "custom" ]]; then
+        printf '\n%b\n' " ${cy}Enter your VPN credentials:${cend}"
+        
+        # Get VPN username with validation
+        while true; do
+            printf '%b' " ${uyc} VPN Username: "
+            read -r vpn_username
+            if [[ -n "$vpn_username" ]]; then
+                break
+            else
+                printf '\n%b\n' " ${ucross} Username cannot be empty. Please try again."
+            fi
+        done
+        
+        # Get VPN password with validation
+        while true; do
+            printf '%b' " ${uyc} VPN Password: "
+            read -s vpn_password
+            printf '\n'
+            if [[ -n "$vpn_password" ]]; then
+                break
+            else
+                printf '\n%b\n' " ${ucross} Password cannot be empty. Please try again."
+            fi
+        done
+        
+        printf '%b' " ${uyc} Preferred country (e.g., United States, Canada, Germany): "
+        read -r vpn_country
+        vpn_country="${vpn_country:-United States}"
+        
+        # Update .env-servarr with VPN settings
+        if [[ -f ".env-servarr" ]] && [[ -w ".env-servarr" ]]; then
+            if sed -i.bak "s|VPN_SERVICE_PROVIDER=.*|VPN_SERVICE_PROVIDER=${vpn_provider}|g" ".env-servarr" 2>/dev/null; then
+                sed -i.bak "s|OPENVPN_USER=.*|OPENVPN_USER=${vpn_username}|g" ".env-servarr" 2>/dev/null
+                sed -i.bak "s|OPENVPN_PASSWORD=.*|OPENVPN_PASSWORD=${vpn_password}|g" ".env-servarr" 2>/dev/null
+                sed -i.bak "s|SERVER_COUNTRIES=.*|SERVER_COUNTRIES=${vpn_country}|g" ".env-servarr" 2>/dev/null
+                
+                printf '\n%b\n' " ${utick} VPN settings configured in .env-servarr"
+            else
+                printf '\n%b\n' " ${ucross} Failed to update .env-servarr file"
+                printf '\n%b\n' " ${uyc} Please check file permissions and try again"
+                return 1
+            fi
+        else
+            printf '\n%b\n' " ${ucross} .env-servarr file not found or not writable"
+            printf '\n%b\n' " ${uyc} VPN settings will need to be configured manually"
+            return 1
+        fi
+    elif [[ "$vpn_provider" == "custom" ]]; then
+        printf '\n%b\n' " ${cy}Custom VPN configuration:${cend}"
+        
+        # Get custom VPN provider with validation
+        while true; do
+            printf '%b' " ${uyc} VPN Service Provider (e.g., protonvpn, mullvad): "
+            read -r vpn_provider
+            if [[ -n "$vpn_provider" ]]; then
+                break
+            else
+                printf '\n%b\n' " ${ucross} Provider name cannot be empty. Please try again."
+            fi
+        done
+        
+        # Get VPN username with validation
+        while true; do
+            printf '%b' " ${uyc} VPN Username: "
+            read -r vpn_username
+            if [[ -n "$vpn_username" ]]; then
+                break
+            else
+                printf '\n%b\n' " ${ucross} Username cannot be empty. Please try again."
+            fi
+        done
+        
+        # Get VPN password with validation
+        while true; do
+            printf '%b' " ${uyc} VPN Password: "
+            read -s vpn_password
+            printf '\n'
+            if [[ -n "$vpn_password" ]]; then
+                break
+            else
+                printf '\n%b\n' " ${ucross} Password cannot be empty. Please try again."
+            fi
+        done
+        
+        printf '%b' " ${uyc} Preferred country: "
+        read -r vpn_country
+        vpn_country="${vpn_country:-United States}"
+        
+        # Update .env-servarr with custom VPN settings
+        if [[ -f ".env-servarr" ]] && [[ -w ".env-servarr" ]]; then
+            if sed -i.bak "s|VPN_SERVICE_PROVIDER=.*|VPN_SERVICE_PROVIDER=${vpn_provider}|g" ".env-servarr" 2>/dev/null; then
+                sed -i.bak "s|OPENVPN_USER=.*|OPENVPN_USER=${vpn_username}|g" ".env-servarr" 2>/dev/null
+                sed -i.bak "s|OPENVPN_PASSWORD=.*|OPENVPN_PASSWORD=${vpn_password}|g" ".env-servarr" 2>/dev/null
+                sed -i.bak "s|SERVER_COUNTRIES=.*|SERVER_COUNTRIES=${vpn_country}|g" ".env-servarr" 2>/dev/null
+                
+                printf '\n%b\n' " ${utick} Custom VPN settings configured in .env-servarr"
+            else
+                printf '\n%b\n' " ${ucross} Failed to update .env-servarr file"
+                printf '\n%b\n' " ${uyc} Please check file permissions and try again"
+                return 1
+            fi
+        else
+            printf '\n%b\n' " ${ucross} .env-servarr file not found or not writable"
+            printf '\n%b\n' " ${uyc} VPN settings will need to be configured manually"
+            return 1
+        fi
+    fi
 }
 
 configure_environment_files() {
@@ -804,14 +876,19 @@ deploy_stacks() {
     printf '\n%b\n' " ${uyc} Deploying homelab media stack..."
     show_loading_message "Preparing container deployment" 1
     
-    # Deploy servarr stack
-    printf '\n%b\n' " ${uyc} Starting SERVARR stack (download & management)..."
-    show_loading_message "Launching download services" 2
+    # Deploy SERVARR stack (download & management)
+    printf '\n%b\n' "${clg}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+    printf '\n%b\n' "${clg}║                        DEPLOYING SERVARR STACK                              ║${cend}"
+    printf '\n%b\n' "${clg}║                    (Download & Management Services)                          ║${cend}"
+    printf '\n%b\n' "${clg}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+    
+    show_loading_message "Launching SERVARR services (VPN, downloads, automation)" 3
     
     if $compose_cmd --env-file .env-servarr -f docker-compose-servarr.yml up -d; then
-        printf '\n%b\n' " ${utick} SERVARR stack started successfully!"
+        printf '\n%b\n' " ${utick} SERVARR stack deployed successfully!"
+        printf '\n%b\n' " ${uyc} Services: Gluetun (VPN), qBittorrent, SABnzbd, Prowlarr, Sonarr, Radarr, Lidarr, Bazarr, FileBot, Homarr"
     else
-        printf '\n%b\n' " ${ucross} Failed to start SERVARR stack"
+        printf '\n%b\n' " ${ucross} Failed to deploy SERVARR stack"
         return 1
     fi
     
@@ -827,15 +904,20 @@ deploy_stacks() {
         printf '\n%b\n' " ${uyc} VPN not yet ready (this is normal, configure it later)"
     fi
     
-    # Deploy streamarr stack
-    printf '\n%b\n' " ${uyc} Starting STREAMARR stack (streaming & requests)..."
-    show_loading_message "Launching streaming services" 2
+    # Deploy STREAMARR stack (streaming & requests)
+    printf '\n%b\n' "${clb}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+    printf '\n%b\n' "${clb}║                       DEPLOYING STREAMARR STACK                             ║${cend}"
+    printf '\n%b\n' "${clb}║                    (Streaming & Request Services)                            ║${cend}"
+    printf '\n%b\n' "${clb}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+    
+    show_loading_message "Launching STREAMARR services (Plex, Overseerr, Tautulli, ErsatzTV)" 3
     
     if $compose_cmd --env-file .env-streamarr -f docker-compose-streamarr.yml up -d; then
-        printf '\n%b\n' " ${utick} STREAMARR stack started successfully!"
+        printf '\n%b\n' " ${utick} STREAMARR stack deployed successfully!"
+        printf '\n%b\n' " ${uyc} Services: Plex Media Server, Overseerr, Tautulli, ErsatzTV"
         return 0
     else
-        printf '\n%b\n' " ${ucross} Failed to start STREAMARR stack"
+        printf '\n%b\n' " ${ucross} Failed to deploy STREAMARR stack"
         return 1
     fi
 }
@@ -847,26 +929,35 @@ show_access_info() {
 ║                        Access your services below:                            ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
     
+    printf '\n%b\n' "${clg}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+    printf '\n%b\n' "${clg}║                        SERVARR STACK (Download & Management)                 ║${cend}"
+    printf '\n%b\n' "${clg}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+    
     printf '\n%b\n' " ${clc}🏠 Homarr Dashboard:${cend} http://${local_ip}:7575"
-    printf '\n%b\n' " ${clc}🎬 Plex Media Server:${cend} http://${local_ip}:32400/web"
-    printf '\n%b\n' " ${clc}📱 Overseerr:${cend} http://${local_ip}:5055"
     printf '\n%b\n' " ${clc}⬇️ qBittorrent:${cend} http://${local_ip}:8080"
+    printf '\n%b\n' " ${clc}📋 SABnzbd:${cend} http://${local_ip}:8090"
+    printf '\n%b\n' " ${clc}🔍 Prowlarr:${cend} http://${local_ip}:9696"
     printf '\n%b\n' " ${clc}📺 Sonarr:${cend} http://${local_ip}:8989"
     printf '\n%b\n' " ${clc}🎥 Radarr:${cend} http://${local_ip}:7878"
     printf '\n%b\n' " ${clc}🎵 Lidarr:${cend} http://${local_ip}:8686"
     printf '\n%b\n' " ${clc}💬 Bazarr:${cend} http://${local_ip}:6767"
-    printf '\n%b\n' " ${clc}🔍 Prowlarr:${cend} http://${local_ip}:9696"
-    printf '\n%b\n' " ${clc}📊 Tautulli:${cend} http://${local_ip}:8181"
-    printf '\n%b\n' " ${clc}📺 ErsatzTV:${cend} http://${local_ip}:8409"
-    printf '\n%b\n' " ${clc}📋 SABnzbd:${cend} http://${local_ip}:8090"
     printf '\n%b\n' " ${clc}🗂️ FileBot:${cend} http://${local_ip}:5452"
     
+    printf '\n%b\n' "${clb}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+    printf '\n%b\n' "${clb}║                       STREAMARR STACK (Streaming & Requests)                 ║${cend}"
+    printf '\n%b\n' "${clb}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+    
+    printf '\n%b\n' " ${clc}🎬 Plex Media Server:${cend} http://${local_ip}:32400/web"
+    printf '\n%b\n' " ${clc}📱 Overseerr:${cend} http://${local_ip}:5055"
+    printf '\n%b\n' " ${clc}📊 Tautulli:${cend} http://${local_ip}:8181"
+    printf '\n%b\n' " ${clc}📺 ErsatzTV:${cend} http://${local_ip}:8409"
+    
     printf '\n%b\n' " ${uyc} ${cy}Next Steps:${cend}"
-    printf '\n%b\n' " ${clc}1.${cend} Configure your VPN settings in .env-servarr"
-    printf '\n%b\n' " ${clc}2.${cend} Set up download clients in Sonarr/Radarr"
-    printf '\n%b\n' " ${clc}3.${cend} Add indexers in Prowlarr"
-    printf '\n%b\n' " ${clc}4.${cend} Configure Plex libraries"
-    printf '\n%b\n' " ${clc}5.${cend} Set up Overseerr for requests"
+    printf '\n%b\n' " ${clc}1.${cend} Set up download clients in Sonarr/Radarr"
+    printf '\n%b\n' " ${clc}2.${cend} Add indexers in Prowlarr"
+    printf '\n%b\n' " ${clc}3.${cend} Configure Plex libraries"
+    printf '\n%b\n' " ${clc}4.${cend} Set up Overseerr for requests"
+    printf '\n%b\n' " ${clc}5.${cend} Configure FileBot for media organization"
     
     printf '\n%b\n' " ${uyc} ${cy}Platform-specific notes for ${clc}${platform}${cy}:${cend}"
     case "$platform" in
@@ -920,9 +1011,130 @@ show_vpn_warning() {
 }
 
 #################################################################################################################################################
+# Cleanup function for failed installations
+#################################################################################################################################################
+cleanup_failed_installation() {
+    local base_path="$1"
+    local error_stage="$2"
+    
+    printf '\n%b\n' "${clr}
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                        ⚠️  INSTALLATION FAILED! ⚠️                           ║
+║                        Cleaning up failed installation...                    ║
+╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+    
+    printf '\n%b\n' " ${uyc} Error occurred during: ${clc}${error_stage}${cend}"
+    printf '\n%b\n' " ${uyc} Cleaning up to prevent corrupted installation..."
+    
+    # Stop any running containers
+    printf '\n%b\n' " ${uyc} Stopping any running containers..."
+    if command -v docker &> /dev/null; then
+        # Stop servarr stack if it exists
+        if [[ -f "docker-compose-servarr.yml" ]] && [[ -f ".env-servarr" ]]; then
+            $compose_cmd --env-file .env-servarr -f docker-compose-servarr.yml down --remove-orphans 2>/dev/null || true
+        fi
+        
+        # Stop streamarr stack if it exists
+        if [[ -f "docker-compose-streamarr.yml" ]] && [[ -f ".env-streamarr" ]]; then
+            $compose_cmd --env-file .env-streamarr -f docker-compose-streamarr.yml down --remove-orphans 2>/dev/null || true
+        fi
+        
+        # Remove any related containers
+        local related_containers=(
+            "gluetun" "qbittorrent" "sabnzbd" "sonarr" "radarr" "lidarr" "bazarr" "prowlarr"
+            "plex" "tautulli" "overseerr" "homarr" "ersatztv" "filebot"
+        )
+        
+        for container in "${related_containers[@]}"; do
+            docker rm -f "$container" 2>/dev/null || true
+        done
+        
+        # Remove networks
+        docker network rm servarr-network 2>/dev/null || true
+        docker network rm streamarr-network 2>/dev/null || true
+    fi
+    
+    # Remove generated environment files
+    printf '\n%b\n' " ${uyc} Removing generated configuration files..."
+    rm -f ".env-servarr" ".env-streamarr" 2>/dev/null || true
+    rm -f ".env-servarr.bak" ".env-streamarr.bak" 2>/dev/null || true
+    
+    # Remove directories if they were created and are empty
+    if [[ -n "$base_path" ]] && [[ -d "$base_path" ]]; then
+        printf '\n%b\n' " ${uyc} Checking for empty directories to remove..."
+        
+        # List of directories that might have been created
+        local created_dirs=(
+            "${base_path}/docker/servarr"
+            "${base_path}/docker/streamarr"
+            "${base_path}/data/downloads/complete"
+            "${base_path}/data/downloads/incomplete"
+            "${base_path}/data/media/movies"
+            "${base_path}/data/media/tv"
+            "${base_path}/data/media/music"
+            "${base_path}/data/plex_transcode"
+        )
+        
+        # Remove empty directories (in reverse order to handle nested dirs)
+        for ((i=${#created_dirs[@]}-1; i>=0; i--)); do
+            local dir="${created_dirs[$i]}"
+            if [[ -d "$dir" ]] && [[ -z "$(ls -A "$dir" 2>/dev/null)" ]]; then
+                if rmdir "$dir" 2>/dev/null; then
+                    printf '\n%b\n' " ${utick} Removed empty directory: ${clc}${dir}${cend}"
+                fi
+            fi
+        done
+        
+        # Try to remove the main docker directory if empty
+        if [[ -d "${base_path}/docker" ]] && [[ -z "$(ls -A "${base_path}/docker" 2>/dev/null)" ]]; then
+            rmdir "${base_path}/docker" 2>/dev/null || true
+        fi
+        
+        # Try to remove the main data directory if empty
+        if [[ -d "${base_path}/data" ]] && [[ -z "$(ls -A "${base_path}/data" 2>/dev/null)" ]]; then
+            rmdir "${base_path}/data" 2>/dev/null || true
+        fi
+        
+        # Try to remove the base path if completely empty
+        if [[ -d "$base_path" ]] && [[ -z "$(ls -A "$base_path" 2>/dev/null)" ]]; then
+            rmdir "$base_path" 2>/dev/null || true
+        fi
+    fi
+    
+    printf '\n%b\n' "${clg}
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                        CLEANUP COMPLETE!                                      ║
+║                                                                               ║
+║  ✅ All containers stopped and removed                                        ║
+║  ✅ All networks removed                                                      ║
+║  ✅ Generated configuration files removed                                     ║
+║  ✅ Empty directories removed                                                 ║
+║  ✅ Your data directories preserved (if any existed)                         ║
+╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+    
+    printf '\n%b\n' " ${uyc} ${cy}What was cleaned up:${cend}"
+    printf '\n%b\n' " ${clc}•${cend} All Docker containers and networks"
+    printf '\n%b\n' " ${clc}•${cend} Generated environment files (.env-servarr, .env-streamarr)"
+    printf '\n%b\n' " ${clc}•${cend} Empty directories created during setup"
+    
+    printf '\n%b\n' " ${uyc} ${cy}What was preserved:${cend}"
+    printf '\n%b\n' " ${clg}•${cend} All existing data directories and files"
+    printf '\n%b\n' " ${clg}•${cend} Original project files (docker-compose-*.yml, .env-*.example)"
+    printf '\n%b\n' " ${clg}•${cend} Your media files and downloads (if any existed)"
+    
+    printf '\n%b\n' " ${uyc} ${cy}Next steps:${cend}"
+    printf '\n%b\n' " ${clc}•${cend} Review the error messages above"
+    printf '\n%b\n' " ${clc}•${cend} Fix any issues and try running the setup again"
+    printf '\n%b\n' " ${clc}•${cend} Or run the uninstall script: ${clc}./scripts/uninstall.sh${cend}"
+}
+
+#################################################################################################################################################
 # Main execution
 #################################################################################################################################################
 main() {
+    # Check sudo requirement
+    check_sudo
+    
     # Show banner
     show_banner
     
@@ -932,58 +1144,87 @@ main() {
     printf '\n%b\n' " Make sure you have proper backups before proceeding."
     printf '\n'
     
-    # Ask for confirmation
-    printf '%b' " ${uyc} Do you want to continue? [y/N]: "
+    # Ask for confirmation with default yes
+    printf '%b' " ${uyc} Do you want to continue? [Y/n]: "
     read -r confirm
-    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+    if [[ "$confirm" =~ ^[Nn]$ ]]; then
         printf '\n%b\n' " ${ucross} Setup cancelled by user."
         exit 0
     fi
     
+    # Initialize variables
+    local base_path=""
+    local platform=""
+    local compose_cmd=""
+    
     # Detect and select platform
-    detect_platform
+    if ! detect_platform; then
+        cleanup_failed_installation "$base_path" "platform detection"
+        exit 1
+    fi
     
     # Check platform-specific prerequisites
-    check_platform_prerequisites
+    if ! check_platform_prerequisites; then
+        cleanup_failed_installation "$base_path" "platform prerequisites check"
+        exit 1
+    fi
     
-    # Get base path from user
+    # Get base path from user with default
     printf '\n%b\n' " ${uyc} Configure installation paths:"
     printf '%b' " Base path for installation [${clc}${default_base_path}${cend}]: "
     read -r user_base_path
     base_path="${user_base_path:-$default_base_path}"
+    printf '\n%b\n' " ${utick} Using base path: ${clc}${base_path}${cend}"
     
     # Get network information
-    get_platform_network_info
+    if ! get_platform_network_info; then
+        cleanup_failed_installation "$base_path" "network information detection"
+        exit 1
+    fi
     
     # Check prerequisites
-    check_prerequisites
+    if ! check_prerequisites; then
+        cleanup_failed_installation "$base_path" "prerequisites check"
+        exit 1
+    fi
     
     # Create directory structure
-    create_directories_for_platform
+    if ! create_directories_for_platform; then
+        cleanup_failed_installation "$base_path" "directory creation"
+        exit 1
+    fi
     
     # Docker Compose will create networks automatically
     printf '\n%b\n' " ${uyc} Docker Compose will create networks automatically..."
     show_loading_message "Networks will be created by Docker Compose" 1
     
     # Configure environment files
-    configure_environment_files
+    if ! configure_environment_files; then
+        cleanup_failed_installation "$base_path" "environment file configuration"
+        exit 1
+    fi
     
-    # Show VPN warning
-    show_vpn_warning
+    # Configure VPN settings
+    if ! configure_vpn_settings; then
+        printf '\n%b\n' " ${uyc} VPN configuration failed, but continuing with setup..."
+        printf '\n%b\n' " ${uyc} You can configure VPN settings manually later"
+    fi
     
-    # Ask if user wants to deploy now
+    # Ask if user wants to deploy now with default yes
     printf '\n%b\n' " ${uyc} Ready to deploy the homelab media stack!"
-    printf '%b' " Deploy now? [y/N]: "
+    printf '%b' " Deploy now? [Y/n]: "
     read -r deploy_confirm
     
-    if [[ "$deploy_confirm" =~ ^[Yy]$ ]]; then
+    if [[ ! "$deploy_confirm" =~ ^[Nn]$ ]]; then
         if deploy_stacks; then
             show_access_info
         else
             printf '\n%b\n' " ${ucross} Deployment failed. Check the errors above."
+            cleanup_failed_installation "$base_path" "container deployment"
             printf '\n%b\n' " ${uyc} You can try deploying manually using:"
             printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-servarr -f docker-compose-servarr.yml up -d${cend}"
             printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-streamarr -f docker-compose-streamarr.yml up -d${cend}"
+            exit 1
         fi
     else
         printf '\n%b\n' " ${uyc} Setup complete! You can deploy later using:"
