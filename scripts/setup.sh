@@ -31,18 +31,18 @@ if [[ -t 1 ]]; then
     uyc="\e[33m\U25cf\e[0m" urc="\e[31m\U25cf\e[0m" ugc="\e[32m\U25cf\e[0m"
     
     # Loading animation characters
-    spinner_chars=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
-    spinner_colors=("\e[31m" "\e[33m" "\e[32m" "\e[36m" "\e[34m" "\e[35m")
-    progress_chars=("▰" "▱")
+    spinner_chars="⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏"
+    spinner_colors="\e[31m \e[33m \e[32m \e[36m \e[34m \e[35m"
+    progress_chars="▰ ▱"
 else
     # No colors for non-terminal output
     cr="" clr="" cg="" clg="" cy="" cly="" cb="" clb="" cm="" clm="" cc="" clc="" cend=""
     utick="✓" uplus="+" ucross="✗" uyc="●" urc="●" ugc="●"
     
     # Loading animation characters (fallback)
-    spinner_chars=("|" "/" "-" "\\")
-    spinner_colors=("" "" "" "")
-    progress_chars=("#" "-")
+    spinner_chars="| / - \\"
+    spinner_colors="   "
+    progress_chars="# -"
 fi
 
 #################################################################################################################################################
@@ -73,8 +73,8 @@ show_animated_spinner() {
     printf '%b' " ${uyc} ${message} "
     
     while [[ $i -lt $((duration * 10)) ]]; do
-        local spinner="${spinner_chars[$((i % ${#spinner_chars[@]}))]}"
-        local color="${spinner_colors[$((color_idx % ${#spinner_colors[@]}))]}"
+        local spinner=$(echo "$spinner_chars" | cut -d' ' -f$((i % 10 + 1)))
+        local color=$(echo "$spinner_colors" | cut -d' ' -f$((color_idx % 6 + 1)))
         printf '\b%b%s%b' "$color" "$spinner" "$cend"
         sleep 0.1
         ((i++))
@@ -96,13 +96,15 @@ show_progress_bar() {
     printf '\r%b' " ${uyc} Progress: ["
     
     # Filled part
+    local filled_char=$(echo "$progress_chars" | cut -d' ' -f1)
     for ((i=0; i<filled; i++)); do
-        printf '%b%s%b' "${clg}" "${progress_chars[0]}" "$cend"
+        printf '%b%s%b' "${clg}" "$filled_char" "$cend"
     done
     
     # Empty part
+    local empty_char=$(echo "$progress_chars" | cut -d' ' -f2)
     for ((i=0; i<empty; i++)); do
-        printf '%s' "${progress_chars[1]}"
+        printf '%s' "$empty_char"
     done
     
     printf '] %d%%' "$percentage"
@@ -130,6 +132,18 @@ show_banner() {
 ║           TrueNAS • Unraid • Proxmox • And More!                              ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
     sleep 1
+}
+
+#################################################################################################################################################
+# Platform-specific helper functions
+#################################################################################################################################################
+show_windows_instructions() {
+    printf '\n%b\n' " ${uyc} ${cy}Windows detected!${cend}"
+    printf '\n%b\n' " ${uyc} For the best experience on Windows, please ensure you're running this script in:"
+    printf '\n%b\n' " ${clc}•${cend} Windows Subsystem for Linux (WSL2) - Recommended"
+    printf '\n%b\n' " ${clc}•${cend} Git Bash"
+    printf '\n%b\n' " ${clc}•${cend} MSYS2/MinGW"
+    printf '\n%b\n' " ${uyc} ${cy}Note:${cend} Paths will use Unix-style format (/c/homelab instead of C:\\homelab)"
 }
 
 #################################################################################################################################################
@@ -332,15 +346,6 @@ detect_platform() {
     printf '%b\n' " ${utick} PUID/PGID: ${clc}${puid}:${pgid}${cend}"
 }
 
-show_windows_instructions() {
-    printf '\n%b\n' " ${uyc} ${cy}Windows detected!${cend}"
-    printf '\n%b\n' " ${uyc} For the best experience on Windows, please ensure you're running this script in:"
-    printf '\n%b\n' " ${clc}•${cend} Windows Subsystem for Linux (WSL2) - Recommended"
-    printf '\n%b\n' " ${clc}•${cend} Git Bash"
-    printf '\n%b\n' " ${clc}•${cend} MSYS2/MinGW"
-    printf '\n%b\n' " ${uyc} ${cy}Note:${cend} Paths will use Unix-style format (/c/homelab instead of C:\\homelab)"
-}
-
 #################################################################################################################################################
 # Platform-specific functions
 #################################################################################################################################################
@@ -488,27 +493,27 @@ get_platform_network_info() {
     # Get local IP based on platform
     case "$platform" in
         "macos")
-            local_ip=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1)
+            declare -g local_ip=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1)
             ;;
         "windows")
             # Try different methods for Windows environments
             if command -v ipconfig.exe &> /dev/null; then
-                local_ip=$(ipconfig.exe | grep -A 1 "Wireless\|Ethernet" | grep "IPv4" | head -1 | awk '{print $NF}' | tr -d '\r')
+                declare -g local_ip=$(ipconfig.exe | grep -A 1 "Wireless\|Ethernet" | grep "IPv4" | head -1 | awk '{print $NF}' | tr -d '\r')
             elif [[ -n "$WSL_DISTRO_NAME" ]]; then
-                local_ip=$(ip route get 1 | awk '{print $7}' | head -1)
+                declare -g local_ip=$(ip route get 1 | awk '{print $7}' | head -1)
             else
-                local_ip=$(hostname -I | awk '{print $1}')
+                declare -g local_ip=$(hostname -I | awk '{print $1}')
             fi
             ;;
         *)
             # Linux-based systems
-            local_ip=$(ip route get 1 2>/dev/null | awk '{print $7}' | head -1 || hostname -I | awk '{print $1}')
+            declare -g local_ip=$(ip route get 1 2>/dev/null | awk '{print $7}' | head -1 || hostname -I | awk '{print $1}')
             ;;
     esac
     
     # Fallback if detection fails
     if [[ -z "$local_ip" || "$local_ip" == "127.0.0.1" ]]; then
-        local_ip="192.168.1.100"
+        declare -g local_ip="192.168.1.100"
         printf '\n%b\n' " ${uyc} Could not detect local IP, using fallback: ${clc}${local_ip}${cend}"
     else
         printf '\n%b\n' " ${utick} Detected local IP: ${clc}${local_ip}${cend}"
@@ -517,17 +522,17 @@ get_platform_network_info() {
     # Get timezone based on platform
     case "$platform" in
         "synology"|"qnap"|"ugreen")
-            timezone=$(cat /etc/timezone 2>/dev/null || cat /usr/share/zoneinfo/UTC 2>/dev/null | head -1 || echo "UTC")
+            declare -g timezone=$(cat /etc/timezone 2>/dev/null || cat /usr/share/zoneinfo/UTC 2>/dev/null | head -1 || echo "UTC")
             ;;
         "macos")
-            timezone=$(readlink /etc/localtime | sed 's|/var/db/timezone/zoneinfo/||' || echo "UTC")
+            declare -g timezone=$(readlink /etc/localtime | sed 's|/var/db/timezone/zoneinfo/||' || echo "UTC")
             ;;
         "windows")
             # Convert Windows timezone to Linux format (basic mapping)
-            timezone="UTC"  # Default, user can modify later
+            declare -g timezone="UTC"  # Default, user can modify later
             ;;
         *)
-            timezone=$(timedatectl show --property=Timezone --value 2>/dev/null || cat /etc/timezone 2>/dev/null || echo "UTC")
+            declare -g timezone=$(timedatectl show --property=Timezone --value 2>/dev/null || cat /etc/timezone 2>/dev/null || echo "UTC")
             ;;
     esac
     
@@ -1161,13 +1166,12 @@ main() {
     
     # Initialize variables
     local base_path=""
-    local compose_cmd=""
     
-    # Determine Docker Compose command
+    # Determine Docker Compose command (make it global)
     if command -v docker-compose &> /dev/null; then
-        compose_cmd="docker-compose"
+        declare -g compose_cmd="docker-compose"
     else
-        compose_cmd="docker compose"
+        declare -g compose_cmd="docker compose"
     fi
     
     # Detect and select platform

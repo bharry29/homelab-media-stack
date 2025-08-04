@@ -146,8 +146,8 @@ detect_platform() {
         auto_path="/opt/homelab"
     fi
     
-    platform="$detected"
-    default_base_path="$auto_path"
+    declare -g platform="$detected"
+    declare -g default_base_path="$auto_path"
     
     printf '\n%b\n' " ${ugc} Detected platform: ${clc}${platform}${cend}"
     printf '\n%b\n' " ${ugc} Default installation path: ${clc}${default_base_path}${cend}"
@@ -175,9 +175,9 @@ check_prerequisites() {
         exit 1
     else
         if command -v docker-compose &> /dev/null; then
-            compose_cmd="docker-compose"
+            declare -g compose_cmd="docker-compose"
         else
-            compose_cmd="docker compose"
+            declare -g compose_cmd="docker compose"
         fi
         printf '\n%b\n' " ${utick} Docker Compose found: ${clc}${compose_cmd}${cend}"
     fi
@@ -208,7 +208,7 @@ find_installation_paths() {
         "/h/homelab"
     )
     
-    found_installations=()
+    declare -g found_installations=()
     
     for path in "${search_paths[@]}"; do
         if [[ -d "$path" ]] && [[ -f "$path/.env-servarr" ]] && [[ -f "$path/.env-streamarr" ]]; then

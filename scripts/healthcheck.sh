@@ -188,28 +188,9 @@ check_docker_status() {
     fi
     
     # Check containers
-    local containers=(
-        "gluetun:VPN Gateway"
-        "qbittorrent:BitTorrent Client"
-        "sabnzbd:Usenet Client"
-        "prowlarr:Indexer Management"
-        "sonarr:TV Show Automation"
-        "radarr:Movie Automation"
-        "lidarr:Music Automation"
-        "bazarr:Subtitle Management"
-        "plex:Media Server"
-        "overseerr:Request Management"
-        "tautulli:Analytics"
-        "ersatztv:Virtual TV"
-        "filebot-node:File Processing UI"
-        "filebot-watcher:Auto Processing"
-        "homarr:Dashboard"
-        "watchtower:Auto Updates"
-    )
+    local containers="gluetun:VPN Gateway qbittorrent:BitTorrent Client sabnzbd:Usenet Client prowlarr:Indexer Management sonarr:TV Show Automation radarr:Movie Automation lidarr:Music Automation bazarr:Subtitle Management plex:Media Server overseerr:Request Management tautulli:Analytics ersatztv:Virtual TV filebot-node:File Processing UI filebot-watcher:Auto Processing homarr:Dashboard watchtower:Auto Updates"
     
-    for container_info in "${containers[@]}"; do
-        local container_name="${container_info%%:*}"
-        local container_desc="${container_info##*:}"
+    echo "$containers" | tr ' ' '\n' | while IFS=':' read -r container_name container_desc; do
         
         if docker ps --format "{{.Names}}" | grep -q "^${container_name}$"; then
             local status=$(docker inspect "$container_name" --format='{{.State.Status}}')
@@ -251,9 +232,9 @@ check_network_connectivity() {
     print_section "Network & Connectivity"
     
     # Check Docker networks
-    local networks=("servarr-network" "streamarr-network")
+    local networks="servarr-network streamarr-network"
     
-    for network in "${networks[@]}"; do
+    echo "$networks" | tr ' ' '\n' | while read -r network; do
         if docker network ls --format "{{.Name}}" | grep -q "^${network}$"; then
             print_status "Network: $network" "HEALTHY" "Exists and configured"
             if [[ "$VERBOSE_MODE" == true ]]; then
@@ -288,18 +269,9 @@ check_network_connectivity() {
     fi
     
     # Check service accessibility
-    local services=(
-        "7575:Homarr Dashboard"
-        "32400:Plex Media Server"
-        "5055:Overseerr"
-        "8080:qBittorrent"
-        "8989:Sonarr"
-        "7878:Radarr"
-    )
+    local services="7575:Homarr Dashboard 32400:Plex Media Server 5055:Overseerr 8080:qBittorrent 8989:Sonarr 7878:Radarr"
     
-    for service_info in "${services[@]}"; do
-        local port="${service_info%%:*}"
-        local service_name="${service_info##*:}"
+    echo "$services" | tr ' ' '\n' | while IFS=':' read -r port service_name; do
         
         if timeout 5 bash -c "</dev/tcp/localhost/$port" 2>/dev/null; then
             print_status "$service_name" "HEALTHY" "Accessible on port $port"
@@ -313,17 +285,9 @@ check_storage_health() {
     print_section "Storage & Disk Usage"
     
     # Check main storage paths
-    local paths=(
-        "/volume1:Main Storage"
-        "/volume1/docker:Configuration Storage"
-        "/volume1/data:Media Storage"
-        "/volume1/data/downloads:Download Storage"
-        "/volume1/data/media:Media Library"
-    )
+    local paths="/volume1:Main Storage /volume1/docker:Configuration Storage /volume1/data:Media Storage /volume1/data/downloads:Download Storage /volume1/data/media:Media Library"
     
-    for path_info in "${paths[@]}"; do
-        local path="${path_info%%:*}"
-        local desc="${path_info##*:}"
+    echo "$paths" | tr ' ' '\n' | while IFS=':' read -r path desc; do
         
         if [[ -d "$path" ]]; then
             local usage=$(df "$path" 2>/dev/null | tail -1 | awk '{print $5}' | sed 's/%//')
@@ -367,9 +331,9 @@ check_service_logs() {
     print_section "Service Health & Logs"
     
     # Check for recent errors in critical services
-    local critical_services=("gluetun" "plex" "sonarr" "radarr" "qbittorrent")
+    local critical_services="gluetun plex sonarr radarr qbittorrent"
     
-    for service in "${critical_services[@]}"; do
+    echo "$critical_services" | tr ' ' '\n' | while read -r service; do
         if docker ps --format "{{.Names}}" | grep -q "^${service}$"; then
             local recent_errors=$(docker logs --since 1h "$service" 2>&1 | grep -i "error\|failed\|exception" | wc -l)
             local recent_warnings=$(docker logs --since 1h "$service" 2>&1 | grep -i "warn" | wc -l)
