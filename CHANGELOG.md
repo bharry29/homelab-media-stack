@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Enhanced Network Management** - Docker Compose handles network creation automatically
 - **Beautiful UI Enhancements** - Colored output, progress bars, and loading animations in scripts
 - **Platform-Specific Optimizations** - Auto-detection for Windows, macOS, Linux, Synology, QNAP, Unraid, and more
-- **Integrated VPN Configuration** - Interactive VPN setup during installation process
+- **Enhanced VPN Configuration** - Interactive VPN setup with 11+ popular providers (NordVPN, Privado, PIA, ExpressVPN, Surfshark, ProtonVPN, Mullvad, CyberGhost, Windscribe, AirVPN, IVPN)
+- **Provider-Specific Authentication** - Automatic handling of different auth methods (username/password, account numbers, OpenVPN credentials)
 - **Automatic Cleanup on Failure** - Comprehensive rollback functionality for failed installations
 - **Enhanced Error Handling** - Robust validation and error recovery throughout setup process
 

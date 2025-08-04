@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # MIT License
 # Homelab Media Stack Universal Setup Script
@@ -77,9 +77,9 @@ show_animated_spinner() {
         local color=$(echo "$spinner_colors" | cut -d' ' -f$((color_idx % 6 + 1)))
         printf '\b%b%s%b' "$color" "$spinner" "$cend"
         sleep 0.1
-        ((i++))
-        if [[ $((i % 10)) -eq 0 ]]; then
-            ((color_idx++))
+        i=$((i + 1))
+        if [ $((i % 10)) -eq 0 ]; then
+            color_idx=$((color_idx + 1))
         fi
     done
     printf '\b \b'
@@ -97,14 +97,18 @@ show_progress_bar() {
     
     # Filled part
     local filled_char=$(echo "$progress_chars" | cut -d' ' -f1)
-    for ((i=0; i<filled; i++)); do
+    i=0
+    while [ $i -lt $filled ]; do
         printf '%b%s%b' "${clg}" "$filled_char" "$cend"
+        i=$((i + 1))
     done
     
     # Empty part
     local empty_char=$(echo "$progress_chars" | cut -d' ' -f2)
-    for ((i=0; i<empty; i++)); do
+    i=0
+    while [ $i -lt $empty ]; do
         printf '%s' "$empty_char"
+        i=$((i + 1))
     done
     
     printf '] %d%%' "$percentage"
@@ -153,11 +157,7 @@ detect_platform() {
     printf '\n%b\n' " ${uyc} Detecting your platform..."
     show_loading_message "Analyzing system environment" 2
     
-    # Make variables global so they can be accessed by main function
-    declare -g platform
-    declare -g default_base_path
-    declare -g puid
-    declare -g pgid
+    # Variables will be set globally by assignment
     
     # Automatic detection
     local detected=""
@@ -166,7 +166,7 @@ detect_platform() {
     local auto_pgid=""
     
     # Check for specific NAS/virtualization platforms first
-    if command -v synoinfo &> /dev/null; then
+    if command -v synoinfo >/dev/null 2>&1; then
         detected="synology"
         auto_path="/volume1"
         auto_puid="1026"
@@ -176,32 +176,32 @@ detect_platform() {
         auto_path="/mnt/user"
         auto_puid="99"
         auto_pgid="100"
-    elif command -v midclt &> /dev/null; then
+    elif command -v midclt >/dev/null 2>&1; then
         detected="truenas"
         auto_path="/mnt"
         auto_puid="1000"
         auto_pgid="1000"
-    elif command -v pveversion &> /dev/null; then
+    elif command -v pveversion >/dev/null 2>&1; then
         detected="proxmox"
         auto_path="/opt/homelab"
         auto_puid="1000"
         auto_pgid="1000"
-    elif [[ -f /etc/ugreen-nas-release ]] || [[ -d /usr/local/ugreen ]]; then
+    elif [ -f /etc/ugreen-nas-release ] || [ -d /usr/local/ugreen ]; then
         detected="ugreen"
         auto_path="/volume1"
         auto_puid="1001"
         auto_pgid="1000"
-    elif command -v qpkg_cli &> /dev/null || [[ -d /share ]]; then
+    elif command -v qpkg_cli >/dev/null 2>&1 || [ -d /share ]; then
         detected="qnap"
         auto_path="/share"
         auto_puid="1000"
         auto_pgid="1000"
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
+    elif [ "$OSTYPE" = "darwin"* ]; then
         detected="macos"
         auto_path="$HOME/homelab"
         auto_puid="1000"
         auto_pgid="1000"
-    elif [[ "$OS" == "Windows_NT" ]] || [[ -n "$WINDIR" ]] || command -v powershell.exe &> /dev/null; then
+    elif [ "$OS" = "Windows_NT" ] || [ -n "$WINDIR" ] || command -v powershell.exe >/dev/null 2>&1; then
         detected="windows"
         auto_path="/c/homelab"  # WSL/Git Bash path style
         auto_puid="1000"
@@ -248,7 +248,7 @@ detect_platform() {
         read -r choice
         
         # Use detected platform if user just presses enter (default behavior)
-        if [[ -z "$choice" && -n "$detected" ]]; then
+        if [ -z "$choice" ] && [ -n "$detected" ]; then
             platform="$detected"
             default_base_path="$auto_path"
             puid="$auto_puid"
@@ -355,8 +355,8 @@ check_platform_prerequisites() {
     case "$platform" in
         "synology")
             # Check if Container Manager or Docker is installed
-            if command -v synopkg &> /dev/null; then
-                if synopkg status ContainerManager &> /dev/null || synopkg status Docker &> /dev/null; then
+                if command -v synopkg >/dev/null 2>&1; then
+        if synopkg status ContainerManager >/dev/null 2>&1 || synopkg status Docker >/dev/null 2>&1; then
                     printf '\n%b\n' " ${utick} Container Manager/Docker package found"
                 else
                     printf '\n%b\n' " ${ucross} Container Manager/Docker not installed"
@@ -367,7 +367,7 @@ check_platform_prerequisites() {
             ;;
         "qnap")
             # Check for Container Station
-            if [[ -d "/usr/local/ContainerStation" ]] || command -v docker &> /dev/null; then
+            if [ -d "/usr/local/ContainerStation" ] || command -v docker >/dev/null 2>&1; then
                 printf '\n%b\n' " ${utick} Container Station/Docker found"
             else
                 printf '\n%b\n' " ${ucross} Container Station not installed"
@@ -377,7 +377,7 @@ check_platform_prerequisites() {
             ;;
         "unraid")
             # Check for Community Applications
-            if [[ -d "/usr/local/emhttp/plugins/dockerMan" ]] || command -v docker &> /dev/null; then
+            if [ -d "/usr/local/emhttp/plugins/dockerMan" ] || command -v docker >/dev/null 2>&1; then
                 printf '\n%b\n' " ${utick} Docker support found"
             else
                 printf '\n%b\n' " ${ucross} Docker not available"
@@ -387,7 +387,7 @@ check_platform_prerequisites() {
             ;;
         "truenas")
             # Check for Docker/Apps
-            if command -v docker &> /dev/null || command -v k3s &> /dev/null; then
+            if command -v docker >/dev/null 2>&1 || command -v k3s >/dev/null 2>&1; then
                 printf '\n%b\n' " ${utick} Container runtime found"
             else
                 printf '\n%b\n' " ${ucross} Container runtime not available"
@@ -399,7 +399,7 @@ check_platform_prerequisites() {
             # Check if we're in a container or VM
             if [[ -f "/.dockerenv" ]]; then
                 printf '\n%b\n' " ${uyc} Running inside Docker container"
-            elif command -v pct &> /dev/null; then
+            elif command -v pct >/dev/null 2>&1; then
                 printf '\n%b\n' " ${utick} Proxmox VE detected"
             else
                 printf '\n%b\n' " ${uyc} Running on Proxmox guest or standalone Linux"
@@ -497,7 +497,7 @@ get_platform_network_info() {
             ;;
         "windows")
             # Try different methods for Windows environments
-            if command -v ipconfig.exe &> /dev/null; then
+            if command -v ipconfig.exe >/dev/null 2>&1; then
                 declare -g local_ip=$(ipconfig.exe | grep -A 1 "Wireless\|Ethernet" | grep "IPv4" | head -1 | awk '{print $NF}' | tr -d '\r')
             elif [[ -n "$WSL_DISTRO_NAME" ]]; then
                 declare -g local_ip=$(ip route get 1 | awk '{print $7}' | head -1)
@@ -547,7 +547,7 @@ check_prerequisites() {
     show_loading_message "Verifying Docker installation" 1
     
     # Check Docker
-    if ! command -v docker &> /dev/null; then
+    if ! command -v docker >/dev/null 2>&1; then
         printf '\n%b\n' " ${ucross} Docker is not installed"
         show_docker_install_instructions
         exit 1
@@ -557,12 +557,12 @@ check_prerequisites() {
     fi
     
     # Check Docker Compose
-    if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null 2>&1; then
+    if ! command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then
         printf '\n%b\n' " ${ucross} Docker Compose is not installed"
         show_compose_install_instructions
         exit 1
     else
-        if command -v docker-compose &> /dev/null; then
+        if command -v docker-compose >/dev/null 2>&1; then
             compose_version=$(docker-compose --version 2>/dev/null)
             compose_cmd="docker-compose"
         else
@@ -654,97 +654,245 @@ configure_vpn_settings() {
     
     # VPN Provider Selection
     printf '\n%b\n' " ${cy}Select your VPN provider:${cend}"
-    printf '\n%b\n' " ${clc}1)${cend} NordVPN"
+    printf '\n%b\n' " ${clc}1)${cend} NordVPN (Most Popular)"
     printf '\n%b\n' " ${clc}2)${cend} PrivadoVPN"
     printf '\n%b\n' " ${clc}3)${cend} Private Internet Access (PIA)"
     printf '\n%b\n' " ${clc}4)${cend} ExpressVPN"
     printf '\n%b\n' " ${clc}5)${cend} Surfshark"
-    printf '\n%b\n' " ${clc}6)${cend} Other (manual configuration)"
-    printf '\n%b\n' " ${clc}7)${cend} Skip VPN setup (configure later)"
+    printf '\n%b\n' " ${clc}6)${cend} ProtonVPN"
+    printf '\n%b\n' " ${clc}7)${cend} Mullvad"
+    printf '\n%b\n' " ${clc}8)${cend} CyberGhost"
+    printf '\n%b\n' " ${clc}9)${cend} Windscribe"
+    printf '\n%b\n' " ${clc}10)${cend} AirVPN"
+    printf '\n%b\n' " ${clc}11)${cend} IVPN"
+    printf '\n%b\n' " ${clc}12)${cend} Other (manual configuration)"
+    printf '\n%b\n' " ${clc}13)${cend} Skip VPN setup (configure later)"
     
     printf '\n'
     while true; do
-        printf '%b' " ${uyc} Select VPN provider [1-7] (default: 7): "
+        printf '%b' " ${uyc} Select VPN provider [1-13] (default: 13): "
         read -r vpn_choice
-        vpn_choice="${vpn_choice:-7}"
+        vpn_choice="${vpn_choice:-13}"
         
         case "$vpn_choice" in
             1)
                 vpn_provider="nordvpn"
                 printf '\n%b\n' " ${uyc} NordVPN selected"
+                printf '\n%b\n' " ${cy}Info:${cend} Uses username/password. Supports OpenVPN and WireGuard."
                 break
                 ;;
             2)
                 vpn_provider="privado"
                 printf '\n%b\n' " ${uyc} PrivadoVPN selected"
+                printf '\n%b\n' " ${cy}Info:${cend} Uses username/password. Supports OpenVPN."
                 break
                 ;;
             3)
                 vpn_provider="private internet access"
                 printf '\n%b\n' " ${uyc} Private Internet Access selected"
+                printf '\n%b\n' " ${cy}Info:${cend} Uses username/password. Supports OpenVPN and WireGuard."
                 break
                 ;;
             4)
                 vpn_provider="expressvpn"
                 printf '\n%b\n' " ${uyc} ExpressVPN selected"
+                printf '\n%b\n' " ${cy}Info:${cend} Uses username/password. Supports OpenVPN."
                 break
                 ;;
             5)
                 vpn_provider="surfshark"
                 printf '\n%b\n' " ${uyc} Surfshark selected"
+                printf '\n%b\n' " ${cy}Info:${cend} Uses username/password. Supports OpenVPN and WireGuard."
                 break
                 ;;
             6)
-                vpn_provider="custom"
-                printf '\n%b\n' " ${uyc} Custom VPN provider selected"
+                vpn_provider="protonvpn"
+                printf '\n%b\n' " ${uyc} ProtonVPN selected"
+                printf '\n%b\n' " ${cy}Info:${cend} Uses OpenVPN credentials. Supports OpenVPN and WireGuard."
                 break
                 ;;
             7)
+                vpn_provider="mullvad"
+                printf '\n%b\n' " ${uyc} Mullvad selected"
+                printf '\n%b\n' " ${cy}Info:${cend} Uses account number (no password). Supports OpenVPN and WireGuard."
+                break
+                ;;
+            8)
+                vpn_provider="cyberghost"
+                printf '\n%b\n' " ${uyc} CyberGhost selected"
+                printf '\n%b\n' " ${cy}Info:${cend} Uses username/password. Supports OpenVPN and WireGuard."
+                break
+                ;;
+            9)
+                vpn_provider="windscribe"
+                printf '\n%b\n' " ${uyc} Windscribe selected"
+                printf '\n%b\n' " ${cy}Info:${cend} Uses username/password. Supports OpenVPN and WireGuard."
+                break
+                ;;
+            10)
+                vpn_provider="airvpn"
+                printf '\n%b\n' " ${uyc} AirVPN selected"
+                printf '\n%b\n' " ${cy}Info:${cend} Uses username/password. Supports OpenVPN and WireGuard."
+                break
+                ;;
+            11)
+                vpn_provider="ivpn"
+                printf '\n%b\n' " ${uyc} IVPN selected"
+                printf '\n%b\n' " ${cy}Info:${cend} Uses username/password. Supports OpenVPN and WireGuard."
+                break
+                ;;
+            12)
+                vpn_provider="custom"
+                printf '\n%b\n' " ${uyc} Custom VPN provider selected"
+                printf '\n%b\n' " ${cy}Info:${cend} You'll need to specify the provider name and credentials manually."
+                break
+                ;;
+            13)
                 vpn_provider=""
                 printf '\n%b\n' " ${uyc} Skipping VPN setup - configure manually later"
                 return 0
                 ;;
             *)
-                printf '\n%b\n' " ${ucross} Invalid choice. Please select 1-7."
+                printf '\n%b\n' " ${ucross} Invalid choice. Please select 1-13."
                 ;;
         esac
     done
     
     if [[ -n "$vpn_provider" && "$vpn_provider" != "custom" ]]; then
-        printf '\n%b\n' " ${cy}Enter your VPN credentials:${cend}"
+        printf '\n%b\n' " ${cy}Enter your VPN credentials for ${vpn_provider}:${cend}"
         
-        # Get VPN username with validation
-        while true; do
-            printf '%b' " ${uyc} VPN Username: "
-            read -r vpn_username
-            if [[ -n "$vpn_username" ]]; then
-                break
-            else
-                printf '\n%b\n' " ${ucross} Username cannot be empty. Please try again."
-            fi
-        done
+        # Handle different authentication methods based on provider
+        case "$vpn_provider" in
+            "mullvad")
+                # Mullvad uses account number instead of username/password
+                printf '\n%b\n' " ${cy}Mullvad uses account number authentication${cend}"
+                while true; do
+                    printf '%b' " ${uyc} Mullvad Account Number (e.g., m1234567890123456): "
+                    read -r vpn_username
+                    if [[ -n "$vpn_username" ]]; then
+                        break
+                    else
+                        printf '\n%b\n' " ${ucross} Account number cannot be empty. Please try again."
+                    fi
+                done
+                vpn_password=""  # Mullvad doesn't use password
+                ;;
+            "protonvpn")
+                # ProtonVPN uses OpenVPN credentials
+                printf '\n%b\n' " ${cy}ProtonVPN uses OpenVPN credentials${cend}"
+                while true; do
+                    printf '%b' " ${uyc} ProtonVPN Username: "
+                    read -r vpn_username
+                    if [[ -n "$vpn_username" ]]; then
+                        break
+                    else
+                        printf '\n%b\n' " ${ucross} Username cannot be empty. Please try again."
+                    fi
+                done
+                while true; do
+                    printf '%b' " ${uyc} ProtonVPN Password: "
+                    read -s vpn_password
+                    printf '\n'
+                    if [[ -n "$vpn_password" ]]; then
+                        break
+                    else
+                        printf '\n%b\n' " ${ucross} Password cannot be empty. Please try again."
+                    fi
+                done
+                ;;
+            "windscribe")
+                # Windscribe uses username/password
+                printf '\n%b\n' " ${cy}Windscribe uses username/password authentication${cend}"
+                while true; do
+                    printf '%b' " ${uyc} Windscribe Username: "
+                    read -r vpn_username
+                    if [[ -n "$vpn_username" ]]; then
+                        break
+                    else
+                        printf '\n%b\n' " ${ucross} Username cannot be empty. Please try again."
+                    fi
+                done
+                while true; do
+                    printf '%b' " ${uyc} Windscribe Password: "
+                    read -s vpn_password
+                    printf '\n'
+                    if [[ -n "$vpn_password" ]]; then
+                        break
+                    else
+                        printf '\n%b\n' " ${ucross} Password cannot be empty. Please try again."
+                    fi
+                done
+                ;;
+            *)
+                # Standard username/password for most providers
+                printf '\n%b\n' " ${cy}Standard username/password authentication${cend}"
+                while true; do
+                    printf '%b' " ${uyc} VPN Username: "
+                    read -r vpn_username
+                    if [[ -n "$vpn_username" ]]; then
+                        break
+                    else
+                        printf '\n%b\n' " ${ucross} Username cannot be empty. Please try again."
+                    fi
+                done
+                while true; do
+                    printf '%b' " ${uyc} VPN Password: "
+                    read -s vpn_password
+                    printf '\n'
+                    if [[ -n "$vpn_password" ]]; then
+                        break
+                    else
+                        printf '\n%b\n' " ${ucross} Password cannot be empty. Please try again."
+                    fi
+                done
+                ;;
+        esac
         
-        # Get VPN password with validation
-        while true; do
-            printf '%b' " ${uyc} VPN Password: "
-            read -s vpn_password
-            printf '\n'
-            if [[ -n "$vpn_password" ]]; then
-                break
-            else
-                printf '\n%b\n' " ${ucross} Password cannot be empty. Please try again."
-            fi
-        done
-        
-        printf '%b' " ${uyc} Preferred country (e.g., United States, Canada, Germany): "
-        read -r vpn_country
-        vpn_country="${vpn_country:-United States}"
+        # Country selection with provider-specific defaults
+        case "$vpn_provider" in
+            "nordvpn")
+                printf '%b' " ${uyc} Preferred country (e.g., United States, Canada, Germany) [default: United States]: "
+                read -r vpn_country
+                vpn_country="${vpn_country:-United States}"
+                ;;
+            "privado")
+                printf '%b' " ${uyc} Preferred country (e.g., United States, Canada, Germany) [default: United States]: "
+                read -r vpn_country
+                vpn_country="${vpn_country:-United States}"
+                ;;
+            "protonvpn")
+                printf '%b' " ${uyc} Preferred country (e.g., United States, Switzerland, Japan) [default: United States]: "
+                read -r vpn_country
+                vpn_country="${vpn_country:-United States}"
+                ;;
+            "mullvad")
+                printf '%b' " ${uyc} Preferred country (e.g., United States, Sweden, Germany) [default: United States]: "
+                read -r vpn_country
+                vpn_country="${vpn_country:-United States}"
+                ;;
+            *)
+                printf '%b' " ${uyc} Preferred country (e.g., United States, Canada, Germany) [default: United States]: "
+                read -r vpn_country
+                vpn_country="${vpn_country:-United States}"
+                ;;
+        esac
         
         # Update .env-servarr with VPN settings
         if [[ -f ".env-servarr" ]] && [[ -w ".env-servarr" ]]; then
             if sed -i.bak "s|VPN_SERVICE_PROVIDER=.*|VPN_SERVICE_PROVIDER=${vpn_provider}|g" ".env-servarr" 2>/dev/null; then
-                sed -i.bak "s|OPENVPN_USER=.*|OPENVPN_USER=${vpn_username}|g" ".env-servarr" 2>/dev/null
-                sed -i.bak "s|OPENVPN_PASSWORD=.*|OPENVPN_PASSWORD=${vpn_password}|g" ".env-servarr" 2>/dev/null
+                # Handle different authentication methods
+                case "$vpn_provider" in
+                    "mullvad")
+                        # Mullvad uses account number in OPENVPN_USER field
+                        sed -i.bak "s|OPENVPN_USER=.*|OPENVPN_USER=${vpn_username}|g" ".env-servarr" 2>/dev/null
+                        sed -i.bak "s|OPENVPN_PASSWORD=.*|OPENVPN_PASSWORD=|g" ".env-servarr" 2>/dev/null
+                        ;;
+                    *)
+                        # Standard username/password for other providers
+                        sed -i.bak "s|OPENVPN_USER=.*|OPENVPN_USER=${vpn_username}|g" ".env-servarr" 2>/dev/null
+                        sed -i.bak "s|OPENVPN_PASSWORD=.*|OPENVPN_PASSWORD=${vpn_password}|g" ".env-servarr" 2>/dev/null
+                        ;;
+                esac
                 sed -i.bak "s|SERVER_COUNTRIES=.*|SERVER_COUNTRIES=${vpn_country}|g" ".env-servarr" 2>/dev/null
                 
                 printf '\n%b\n' " ${utick} VPN settings configured in .env-servarr"
@@ -760,6 +908,7 @@ configure_vpn_settings() {
         fi
     elif [[ "$vpn_provider" == "custom" ]]; then
         printf '\n%b\n' " ${cy}Custom VPN configuration:${cend}"
+        printf '\n%b\n' " ${cy}Available providers:${cend} airvpn, cyberghost, expressvpn, fastestvpn, giganews, hidemyass, ipvanish, ivpn, mullvad, nordvpn, perfect privacy, privado, private internet access, privatevpn, protonvpn, purevpn, slickvpn, surfshark, torguard, vpnsecure.me, vpnunlimited, vyprvpn, wevpn, windscribe"
         
         # Get custom VPN provider with validation
         while true; do
@@ -1040,7 +1189,7 @@ cleanup_failed_installation() {
     
     # Stop any running containers
     printf '\n%b\n' " ${uyc} Stopping any running containers..."
-    if command -v docker &> /dev/null; then
+    if command -v docker >/dev/null 2>&1; then
         # Stop servarr stack if it exists
         if [[ -f "docker-compose-servarr.yml" ]] && [[ -f ".env-servarr" ]]; then
             $compose_cmd --env-file .env-servarr -f docker-compose-servarr.yml down --remove-orphans 2>/dev/null || true
@@ -1168,7 +1317,7 @@ main() {
     local base_path=""
     
     # Determine Docker Compose command (make it global)
-    if command -v docker-compose &> /dev/null; then
+    if command -v docker-compose >/dev/null 2>&1; then
         declare -g compose_cmd="docker-compose"
     else
         declare -g compose_cmd="docker compose"

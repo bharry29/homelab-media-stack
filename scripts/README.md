@@ -250,7 +250,7 @@ wsl --exec ./scripts/setup.sh
 nano .env-servarr  # or your preferred editor
 
 # Set your VPN provider credentials
-VPN_SERVICE_PROVIDER=nordvpn
+VPN_SERVICE_PROVIDER=privado
 OPENVPN_USER=your-username
 OPENVPN_PASSWORD=your-password
 SERVER_COUNTRIES=United States

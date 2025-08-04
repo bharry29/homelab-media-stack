@@ -597,15 +597,12 @@ sqlite3 /volume1/docker/servarr/sonarr/sonarr.db "PRAGMA integrity_check;"
 # 1. Remove and recreate Docker networks
 docker network rm servarr-network streamarr-network
 
-# 2. Recreate networks
-docker network create --driver bridge --subnet=172.39.0.0/24 servarr-network
-docker network create --driver bridge --subnet=172.40.0.0/24 streamarr-network
-
-# 3. Restart all services
-docker-compose --env-file .env-servarr -f docker-compose-servarr.yml down
-docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml down
+# 2. Let Docker Compose recreate networks automatically
 docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
 docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
+
+# Note: Docker Compose will automatically create the networks with proper configuration
+# No manual network creation is needed
 ```
 
 ## 📊 Monitoring & Maintenance

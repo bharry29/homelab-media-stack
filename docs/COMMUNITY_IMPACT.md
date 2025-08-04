@@ -32,7 +32,7 @@ mkdir -p /volume1/docker/servarr
 mkdir -p /volume1/docker/streamarr
 mkdir -p /volume1/data/downloads/complete
 # ... 47 more manual steps
-docker network create --driver bridge --subnet=172.39.0.0/24 servarr-network
+# Docker Compose handles network creation automatically
 # ... hours of configuration
 ```
 

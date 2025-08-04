@@ -171,21 +171,29 @@ Please confirm or select your platform:
 🔐 Configuring VPN settings for Gluetun...
 
 Select your VPN provider:
-1) NordVPN
+1) NordVPN (Most Popular)
 2) PrivadoVPN
 3) Private Internet Access (PIA)
 4) ExpressVPN
 5) Surfshark
-6) Other (manual configuration)
-7) Skip VPN setup (configure later)
+6) ProtonVPN
+7) Mullvad
+8) CyberGhost
+9) Windscribe
+10) AirVPN
+11) IVPN
+12) Other (manual configuration)
+13) Skip VPN setup (configure later)
 
-[?] Select VPN provider [1-7] (default: 7): 1
-● NordVPN selected
+[?] Select VPN provider [1-13] (default: 13): 2
+● PrivadoVPN selected
+Info: Uses username/password. Supports OpenVPN.
 
-Enter your VPN credentials:
-● VPN Username: your_nordvpn_username
+Enter your VPN credentials for privado:
+Standard username/password authentication
+● VPN Username: your_privado_username
 ● VPN Password: [hidden input]
-● Preferred country (e.g., United States, Canada, Germany): United States
+● Preferred country (e.g., United States, Canada, Germany) [default: United States]: United States
 
 ✅ VPN settings configured in .env-servarr
 
@@ -326,7 +334,7 @@ PGID=1000
 TZ=America/Los_Angeles
 
 # VPN Configuration - REQUIRED
-VPN_SERVICE_PROVIDER=nordvpn  # or privado, expressvpn, etc.
+VPN_SERVICE_PROVIDER=privado  # nordvpn, privado, expressvpn, surfshark, protonvpn, mullvad, cyberghost, windscribe, airvpn, ivpn, etc.
 OPENVPN_USER=your-vpn-username
 OPENVPN_PASSWORD=your-vpn-password
 SERVER_COUNTRIES=United States

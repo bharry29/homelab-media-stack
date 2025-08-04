@@ -75,9 +75,9 @@ PGID=1000  # Your group ID
 TZ=America/Los_Angeles  # Your timezone
 
 # VPN Configuration - CRITICAL
-VPN_SERVICE_PROVIDER=nordvpn  # Your VPN provider
-OPENVPN_USER=your-nordvpn-openvpn-username  # NOT your regular login
-OPENVPN_PASSWORD=your-nordvpn-openvpn-password  # NOT your regular password
+VPN_SERVICE_PROVIDER=privado  # Your VPN provider
+OPENVPN_USER=your-vpn-username  # Your VPN provider username
+OPENVPN_PASSWORD=your-vpn-password  # Your VPN provider password
 SERVER_COUNTRIES=United States  # Preferred VPN location
 
 # Directory Paths (adjust if you used different paths)
