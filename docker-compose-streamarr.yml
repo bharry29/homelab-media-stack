@@ -40,6 +40,9 @@ services:
     image: ghcr.io/hotio/plex
     restart: unless-stopped
     
+    # User and group configuration for proper permissions
+    user: "${PUID}:${PGID}"
+    
     # Network configuration
     networks:
       streamarr-network:
@@ -70,6 +73,7 @@ services:
       - ${STREAMARR_CONFIG_PATH}/plex:/config
       - ${DATA_PATH}/plex_transcode:/transcode
       - ${DATA_PATH}:/data
+      - /etc/localtime:/etc/localtime:ro
     
     # Update management
     labels:
@@ -83,6 +87,9 @@ services:
     container_name: overseerr
     image: lscr.io/linuxserver/overseerr:latest
     restart: unless-stopped
+    
+    # User and group configuration for proper permissions
+    user: "${PUID}:${PGID}"
     
     # Network configuration
     networks:
@@ -126,6 +133,9 @@ services:
     image: lscr.io/linuxserver/tautulli:latest
     restart: unless-stopped
     
+    # User and group configuration for proper permissions
+    user: "${PUID}:${PGID}"
+    
     # Network configuration
     networks:
       streamarr-network:
@@ -166,6 +176,9 @@ services:
     container_name: ersatztv
     image: jasongdove/ersatztv:latest
     restart: unless-stopped
+    
+    # User and group configuration for proper permissions
+    user: "${PUID}:${PGID}"
     
     # Network configuration
     networks:

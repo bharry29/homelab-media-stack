@@ -129,11 +129,14 @@ show_loading_message() {
 show_banner() {
     printf '\n%b\n' "${cb}
 ╔═══════════════════════════════════════════════════════════════════════════════╗
-║                          HOMELAB MEDIA STACK                                  ║
-║                     Universal Setup Script v2.2                               ║
 ║                                                                               ║
-║  Supports: Windows • macOS • Linux • Synology • UGREEN • QNAP                 ║
-║           TrueNAS • Unraid • Proxmox • And More!                              ║
+║                    HOMELAB MEDIA STACK                                        ║
+║                                                                               ║
+║                    Universal Setup Script v2.2                                ║
+║                                                                               ║
+║     Supports: Windows • macOS • Linux • Synology • UGREEN • QNAP              ║
+║     TrueNAS • Unraid • Proxmox • And More!                                    ║
+║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
     sleep 1
 }
@@ -1032,14 +1035,41 @@ configure_environment_files() {
     printf '\n%b\n' " ${utick} Environment files configured!"
 }
 
+fix_permissions() {
+    printf '\n%b\n' " ${uyc} Fixing directory permissions..."
+    
+    # Fix permissions for all created directories
+    if [[ "$platform" != "windows" ]]; then
+        # Linux/macOS/NAS systems
+        if command -v chown >/dev/null 2>&1; then
+            chown -R "${puid}:${pgid}" "${base_path}" 2>/dev/null || true
+            printf '\n%b\n' " ${utick} Set ownership to ${puid}:${pgid}"
+        fi
+        
+        if command -v chmod >/dev/null 2>&1; then
+            find "${base_path}" -type d -exec chmod 755 {} \; 2>/dev/null || true
+            find "${base_path}" -type f -exec chmod 644 {} \; 2>/dev/null || true
+            printf '\n%b\n' " ${utick} Set proper file permissions"
+        fi
+    else
+        # Windows - permissions handled by Docker
+        printf '\n%b\n' " ${uyc} Windows detected - permissions will be handled by Docker"
+    fi
+    
+    printf '\n%b\n' " ${utick} Permission fix completed!"
+}
+
 deploy_stacks() {
     printf '\n%b\n' " ${uyc} Deploying homelab media stack..."
     show_loading_message "Preparing container deployment" 1
     
     # Deploy SERVARR stack (download & management)
     printf '\n%b\n' "${clg}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
-    printf '\n%b\n' "${clg}║                        DEPLOYING SERVARR STACK                              ║${cend}"
-    printf '\n%b\n' "${clg}║                    (Download & Management Services)                          ║${cend}"
+    printf '\n%b\n' "${clg}║                                                                               ║${cend}"
+    printf '\n%b\n' "${clg}║                    DEPLOYING SERVARR STACK                                    ║${cend}"
+    printf '\n%b\n' "${clg}║                                                                               ║${cend}"
+    printf '\n%b\n' "${clg}║                    (Download & Management Services)                           ║${cend}"
+    printf '\n%b\n' "${clg}║                                                                               ║${cend}"
     printf '\n%b\n' "${clg}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
     
     show_loading_message "Launching SERVARR services (VPN, downloads, automation)" 3
@@ -1066,8 +1096,11 @@ deploy_stacks() {
     
     # Deploy STREAMARR stack (streaming & requests)
     printf '\n%b\n' "${clb}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
-    printf '\n%b\n' "${clb}║                       DEPLOYING STREAMARR STACK                             ║${cend}"
-    printf '\n%b\n' "${clb}║                    (Streaming & Request Services)                            ║${cend}"
+    printf '\n%b\n' "${clb}║                                                                               ║${cend}"
+    printf '\n%b\n' "${clb}║                    DEPLOYING STREAMARR STACK                                  ║${cend}"
+    printf '\n%b\n' "${clb}║                                                                               ║${cend}"
+    printf '\n%b\n' "${clb}║                    (Streaming & Request Services)                             ║${cend}"
+    printf '\n%b\n' "${clb}║                                                                               ║${cend}"
     printf '\n%b\n' "${clb}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
     
     show_loading_message "Launching STREAMARR services (Plex, Overseerr, Tautulli, ErsatzTV)" 3
@@ -1085,32 +1118,39 @@ deploy_stacks() {
 show_access_info() {
     printf '\n%b\n' "${clg}
 ╔═══════════════════════════════════════════════════════════════════════════════╗
-║                             SETUP COMPLETE!                                   ║
+║                                                                               ║
+║                            SETUP COMPLETE!                                    ║
+║                                                                               ║
 ║                        Access your services below:                            ║
+║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
     
     printf '\n%b\n' "${clg}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
-    printf '\n%b\n' "${clg}║                        SERVARR STACK (Download & Management)                 ║${cend}"
+    printf '\n%b\n' "${clg}║                                                                               ║${cend}"
+    printf '\n%b\n' "${clg}║                    SERVARR STACK (Download & Management)                      ║${cend}"
+    printf '\n%b\n' "${clg}║                                                                               ║${cend}"
     printf '\n%b\n' "${clg}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
     
-    printf '\n%b\n' " ${clc}🏠 Homarr Dashboard:${cend} http://${local_ip}:7575"
-    printf '\n%b\n' " ${clc}⬇️ qBittorrent:${cend} http://${local_ip}:8080"
-    printf '\n%b\n' " ${clc}📋 SABnzbd:${cend} http://${local_ip}:8090"
-    printf '\n%b\n' " ${clc}🔍 Prowlarr:${cend} http://${local_ip}:9696"
-    printf '\n%b\n' " ${clc}📺 Sonarr:${cend} http://${local_ip}:8989"
-    printf '\n%b\n' " ${clc}🎥 Radarr:${cend} http://${local_ip}:7878"
-    printf '\n%b\n' " ${clc}🎵 Lidarr:${cend} http://${local_ip}:8686"
-    printf '\n%b\n' " ${clc}💬 Bazarr:${cend} http://${local_ip}:6767"
-    printf '\n%b\n' " ${clc}🗂️ FileBot:${cend} http://${local_ip}:5452"
+    printf '\n%b\n' " ${clc}Homarr Dashboard:${cend} http://${local_ip}:7575"
+    printf '\n%b\n' " ${clc}qBittorrent:${cend} http://${local_ip}:8080"
+    printf '\n%b\n' " ${clc}SABnzbd:${cend} http://${local_ip}:8090"
+    printf '\n%b\n' " ${clc}Prowlarr:${cend} http://${local_ip}:9696"
+    printf '\n%b\n' " ${clc}Sonarr:${cend} http://${local_ip}:8989"
+    printf '\n%b\n' " ${clc}Radarr:${cend} http://${local_ip}:7878"
+    printf '\n%b\n' " ${clc}Lidarr:${cend} http://${local_ip}:8686"
+    printf '\n%b\n' " ${clc}Bazarr:${cend} http://${local_ip}:6767"
+    printf '\n%b\n' " ${clc}FileBot:${cend} http://${local_ip}:5452"
     
     printf '\n%b\n' "${clb}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
-    printf '\n%b\n' "${clb}║                       STREAMARR STACK (Streaming & Requests)                 ║${cend}"
+    printf '\n%b\n' "${clb}║                                                                               ║${cend}"
+    printf '\n%b\n' "${clb}║                    STREAMARR STACK (Streaming & Requests)                     ║${cend}"
+    printf '\n%b\n' "${clb}║                                                                               ║${cend}"
     printf '\n%b\n' "${clb}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
     
-    printf '\n%b\n' " ${clc}🎬 Plex Media Server:${cend} http://${local_ip}:32400/web"
-    printf '\n%b\n' " ${clc}📱 Overseerr:${cend} http://${local_ip}:5055"
-    printf '\n%b\n' " ${clc}📊 Tautulli:${cend} http://${local_ip}:8181"
-    printf '\n%b\n' " ${clc}📺 ErsatzTV:${cend} http://${local_ip}:8409"
+    printf '\n%b\n' " ${clc}Plex Media Server:${cend} http://${local_ip}:32400/web"
+    printf '\n%b\n' " ${clc}Overseerr:${cend} http://${local_ip}:5055"
+    printf '\n%b\n' " ${clc}Tautulli:${cend} http://${local_ip}:8181"
+    printf '\n%b\n' " ${clc}ErsatzTV:${cend} http://${local_ip}:8409"
     
     printf '\n%b\n' " ${uyc} ${cy}Next Steps:${cend}"
     printf '\n%b\n' " ${clc}1.${cend} Set up download clients in Sonarr/Radarr"
@@ -1157,7 +1197,9 @@ show_access_info() {
 show_vpn_warning() {
     printf '\n%b\n' "${clr}
 ╔═══════════════════════════════════════════════════════════════════════════════╗
-║                       ⚠️  IMPORTANT: VPN REQUIRED! ⚠️                        ║
+║                                                                               ║
+║                       IMPORTANT: VPN REQUIRED!                                ║
+║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
     
     printf '\n%b\n' " ${cy}Before using download clients, you MUST configure your VPN:${cend}"
@@ -1180,8 +1222,11 @@ cleanup_failed_installation() {
     
     printf '\n%b\n' "${clr}
 ╔═══════════════════════════════════════════════════════════════════════════════╗
-║                        ⚠️  INSTALLATION FAILED! ⚠️                           ║
-║                        Cleaning up failed installation...                    ║
+║                                                                               ║
+║                        INSTALLATION FAILED!                                   ║
+║                                                                               ║
+║                        Cleaning up failed installation...                     ║
+║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
     
     printf '\n%b\n' " ${uyc} Error occurred during: ${clc}${error_stage}${cend}"
@@ -1264,13 +1309,15 @@ cleanup_failed_installation() {
     
     printf '\n%b\n' "${clg}
 ╔═══════════════════════════════════════════════════════════════════════════════╗
+║                                                                               ║
 ║                        CLEANUP COMPLETE!                                      ║
 ║                                                                               ║
-║  ✅ All containers stopped and removed                                        ║
-║  ✅ All networks removed                                                      ║
-║  ✅ Generated configuration files removed                                     ║
-║  ✅ Empty directories removed                                                 ║
-║  ✅ Your data directories preserved (if any existed)                         ║
+║  All containers stopped and removed                                           ║
+║  All networks removed                                                         ║
+║  Generated configuration files removed                                        ║
+║  Empty directories removed                                                    ║
+║  Your data directories preserved (if any existed)                             ║
+║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
     
     printf '\n%b\n' " ${uyc} ${cy}What was cleaned up:${cend}"
@@ -1300,7 +1347,7 @@ main() {
     show_banner
     
     # Show disclaimer
-    printf '\n%b\n' " ${uyc} ${cy}⚠️ DISCLAIMER:${cend} Use this script at your own risk."
+    printf '\n%b\n' " ${uyc} ${cy}DISCLAIMER:${cend} Use this script at your own risk."
     printf '\n%b\n' " This script will create directories, configure files, and deploy containers."
     printf '\n%b\n' " Make sure you have proper backups before proceeding."
     printf '\n'
@@ -1375,6 +1422,9 @@ main() {
         printf '\n%b\n' " ${uyc} VPN configuration failed, but continuing with setup..."
         printf '\n%b\n' " ${uyc} You can configure VPN settings manually later"
     fi
+    
+    # Fix permissions before deployment
+    fix_permissions
     
     # Ask if user wants to deploy now with default yes
     printf '\n%b\n' " ${uyc} Ready to deploy the homelab media stack!"

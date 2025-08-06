@@ -53,6 +53,9 @@ services:
     hostname: gluetun
     restart: unless-stopped
     
+    # User and group configuration for proper permissions
+    user: "${PUID}:${PGID}"
+    
     # Network configuration
     networks:
       servarr-network:
@@ -79,6 +82,7 @@ services:
     # Persistent storage
     volumes:
       - ${SERVARR_CONFIG_PATH}/gluetun:/gluetun
+      - /etc/localtime:/etc/localtime:ro
     
     # VPN configuration (from environment file)
     environment:
@@ -164,6 +168,7 @@ services:
     image: ghcr.io/hotio/sabnzbd:latest
     container_name: sabnzbd
     restart: unless-stopped
+    user: "${PUID}:${PGID}"
     
     # Use VPN network stack (no direct internet access)
     network_mode: service:gluetun

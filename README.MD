@@ -2,6 +2,8 @@
 
 A comprehensive, production-ready Docker-based media automation stack for home servers and NAS systems. This project provides a complete solution for automated media acquisition, processing, and streaming with enterprise-grade security through VPN integration.
 
+
+
 ## 🏗️ Architecture Overview
 
 This stack uses a **dual-stack architecture** with proper network isolation and shared data volumes:

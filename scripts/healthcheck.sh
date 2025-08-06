@@ -445,15 +445,15 @@ send_webhook_notification() {
         case $OVERALL_HEALTH in
             "HEALTHY")
                 color="3066993"  # Green
-                status_emoji="✅"
+                status_emoji=""
                 ;;
             "WARNING")
                 color="16776960"  # Yellow
-                status_emoji="⚠️"
+                status_emoji=""
                 ;;
             "CRITICAL")
                 color="15158332"  # Red
-                status_emoji="🚨"
+                status_emoji=""
                 ;;
         esac
         

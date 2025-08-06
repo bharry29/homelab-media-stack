@@ -469,7 +469,7 @@ main() {
     
     show_backup_summary "$backup_file"
     
-    print_success "Backup completed successfully! 🎉"
+    print_success "Backup completed successfully!"
 }
 
 # Error handling

@@ -96,11 +96,14 @@ show_loading_message() {
 show_banner() {
     printf '\n%b\n' "${cr}
 ╔═══════════════════════════════════════════════════════════════════════════════╗
-║                        HOMELAB MEDIA STACK                                    ║
-║                     Universal Uninstall Script v2.1                           ║
+║                                                                               ║
+║                    HOMELAB MEDIA STACK                                        ║
+║                                                                               ║
+║                    Universal Uninstall Script v2.1                            ║
 ║                                                                               ║
 ║  Supports: Windows • macOS • Linux • Synology • UGREEN • QNAP                 ║
-║           TrueNAS • Unraid • Proxmox • And More!                              ║
+║     TrueNAS • Unraid • Proxmox • And More!                                    ║
+║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
     sleep 1
 }
@@ -499,7 +502,7 @@ remove_custom_networks() {
                     printf '\n%b\n' " ${ucross} Failed to remove Docker network: ${clc}${net}${cend}"
                 fi
             else
-                printf '\n%b\n' " ${cy}⚠️  Could not remove network ${clc}${net}${cend} because it is still in use by containers:${cend}"
+                printf '\n%b\n' " ${cy}Could not remove network ${clc}${net}${cend} because it is still in use by containers:${cend}"
                 for c in $containers; do
                     printf '\n%b\n' "   - $c"
                 done
@@ -517,7 +520,7 @@ main() {
     show_banner
     
     # Show disclaimer
-    printf '\n%b\n' " ${uyc} ${cy}⚠️ DISCLAIMER:${cend} This script will remove Docker components only."
+    printf '\n%b\n' " ${uyc} ${cy}DISCLAIMER:${cend} This script will remove Docker components only."
     printf '\n%b\n' " Your media files and data directories will be preserved."
     printf '\n%b\n' " Only Docker containers, networks, volumes, and config files will be removed."
     printf '\n'
@@ -572,15 +575,17 @@ main() {
     # Success message
     printf '\n%b\n' "${clg}
 ╔═══════════════════════════════════════════════════════════════════════════════╗
-║                        DOCKER UNINSTALL COMPLETE!                            ║
 ║                                                                               ║
-║  ✅ All containers stopped and removed                                       ║
-║  ✅ All networks cleaned up                                                  ║
-║  ✅ All volumes removed                                                      ║
-║  ✅ Docker configuration files removed                                       ║
-║  ✅ Docker system cleaned up                                                 ║
+║                        DOCKER UNINSTALL COMPLETE!                             ║
 ║                                                                               ║
-║  🗑️  Docker components removed - your data is preserved!                     ║
+║  All containers stopped and removed                                           ║
+║  All networks cleaned up                                                      ║
+║  All volumes removed                                                          ║
+║  Docker configuration files removed                                           ║
+║  Docker system cleaned up                                                     ║
+║                                                                               ║
+║  Docker components removed - your data is preserved!                          ║
+║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
     
     printf '\n%b\n' " ${uyc} ${cy}What was removed:${cend}"
