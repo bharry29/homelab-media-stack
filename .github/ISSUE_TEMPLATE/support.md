@@ -72,7 +72,7 @@ PLEX_ADVERTISE_URL=http://192.168.1.100:32400
 **Modified configurations:**
 Have you changed anything from the default setup? If so, what and why?
 
-## 🔍 What You've Tried
+## What You've Tried
 
 **Steps attempted:**
 Please list what you've already tried to solve this issue or achieve your goal.
@@ -92,7 +92,7 @@ Please list what you've already tried to solve this issue or achieve your goal.
 **Error messages or unexpected behavior:**
 Include any error messages you've encountered or describe what's happening vs. what you expected.
 
-## 📋 Current Service Status
+## Current Service Status
 
 **Container status:**
 ```bash

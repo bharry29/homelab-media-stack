@@ -217,7 +217,7 @@ Plex Clients → Media Streaming → Tautulli Monitoring → Usage Analytics
   Interfaces    (if needed)         & Statistics       Notifications
 ```
 
-## 🗂️ Directory Purpose & Management
+## Directory Purpose & Management
 
 ### Configuration Directories (`/volume1/docker/`)
 
@@ -260,7 +260,7 @@ Plex Clients → Media Streaming → Tautulli Monitoring → Usage Analytics
 - **Size**: 20-100GB depending on concurrent streams
 - **Monitoring**: Disk I/O and cleanup effectiveness
 
-## 📊 Storage Allocation Guidelines
+## Storage Allocation Guidelines
 
 ### Minimum Setup (500GB)
 ```
@@ -355,7 +355,7 @@ find /volume1/data/downloads/complete/ -type d -empty -delete
 - **Transcoding**: `/volume1/data/plex_transcode/` (cache files)
 - **Log Files**: `/volume1/docker/*/logs/` (can be regenerated)
 
-## 🔍 Troubleshooting by Directory
+## Troubleshooting by Directory
 
 ### Common Directory Issues
 

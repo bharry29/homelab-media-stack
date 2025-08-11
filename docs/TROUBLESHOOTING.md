@@ -2,7 +2,7 @@
 
 This guide covers common issues and their solutions for the Homelab Media Stack.
 
-## 🚨 Quick Diagnosis Commands
+## Quick Diagnosis Commands
 
 ### Check All Services Status
 ```bash
@@ -605,7 +605,7 @@ docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
 # No manual network creation is needed
 ```
 
-## 📊 Monitoring & Maintenance
+## Monitoring & Maintenance
 
 ### Health Check Script
 ```bash
@@ -701,7 +701,7 @@ echo "REMEMBER: Remove sensitive data before sharing!"
 6. **Document Changes**: Keep notes of configuration changes
 7. **Health Checks**: Run the health check script weekly
 
-## 🔍 Debug Mode
+## Debug Mode
 
 ### Enable Debug Logging
 ```bash

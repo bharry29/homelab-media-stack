@@ -55,7 +55,7 @@ mkdir -p /volume1/data/downloads/complete
 - **Kill Switch**: Prevents IP leaks if VPN fails
 - **DNS Protection**: Containerized DNS resolution
 
-## 📊 Community Impact Metrics
+## Community Impact Metrics
 
 ### Accessibility Improvements
 - **Setup Time**: Reduced from 4+ hours to under 10 minutes

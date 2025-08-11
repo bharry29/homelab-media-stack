@@ -49,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2025-01-XX
 
-### 🎉 Initial Release
+### Initial Release
 
 The first stable release of the Homelab Media Stack - a comprehensive, production-ready Docker-based media automation solution with enterprise-grade security through VPN integration.
 

@@ -2,7 +2,7 @@
 
 This directory contains utility scripts for maintaining your Homelab Media Stack.
 
-## 📁 Available Scripts
+## Available Scripts
 
 ### 🚀 `setup.sh` - Universal Setup Script
 **Purpose**: Interactive setup and deployment for your homelab media stack across ALL platforms
@@ -20,14 +20,14 @@ This directory contains utility scripts for maintaining your Homelab Media Stack
 - ⚙️ **Custom/Other** platforms
 
 **Features:**
-- ✅ **Automatic platform detection** with manual override option
-- ✅ **Interactive setup wizard** with colored output and progress indicators
-- ✅ **Platform-specific configurations** (paths, permissions, PUID/PGID)
-- ✅ **Automated directory creation** with proper ownership
-- ✅ **Environment file configuration** with auto-detected IP and timezone
-- ✅ **Docker network creation** for dual-stack architecture
-- ✅ **VPN validation** and security checks
-- ✅ **Comprehensive service overview** with platform-specific notes
+- **Automatic platform detection** with manual override option
+- **Interactive setup wizard** with colored output and progress indicators
+- **Platform-specific configurations** (paths, permissions, PUID/PGID)
+- **Automated directory creation** with proper ownership
+- **Environment file configuration** with auto-detected IP and timezone
+- **Docker network creation** for dual-stack architecture
+- **VPN validation** and security checks
+- **Comprehensive service overview** with platform-specific notes
 
 **Usage:**
 ```bash
@@ -53,27 +53,27 @@ wsl
 ```
 
 **What the script does:**
-1. **🔍 Platform Detection** - Automatically detects your system type
-2. **📋 Platform Selection** - Interactive menu to confirm or override detection
-3. **✅ Prerequisites Check** - Verifies Docker and Docker Compose installation
-4. **📁 Directory Creation** - Creates complete folder structure with proper permissions
-5. **🌐 Network Setup** - Creates isolated Docker networks for security
-6. **⚙️ Environment Config** - Configures `.env-servarr` and `.env-streamarr` files
-7. **🚀 Stack Deployment** - Deploys both servarr and streamarr stacks
-8. **📊 Service Overview** - Shows access URLs and platform-specific next steps
+1. **Platform Detection** - Automatically detects your system type
+2. **Platform Selection** - Interactive menu to confirm or override detection
+3. **Prerequisites Check** - Verifies Docker and Docker Compose installation
+4. **Directory Creation** - Creates complete folder structure with proper permissions
+5. **Network Setup** - Creates isolated Docker networks for security
+6. **Environment Config** - Configures `.env-servarr` and `.env-streamarr` files
+7. **Stack Deployment** - Deploys both servarr and streamarr stacks
+8. **Service Overview** - Shows access URLs and platform-specific next steps
 
 **Platform-Specific Features:**
 | Platform | Auto-Detection | Default Path | PUID:PGID | Special Notes |
 |----------|----------------|--------------|-----------|---------------|
-| **Synology** | ✅ synoinfo | `/volume1` | 1026:100 | Container Manager support |
-| **UGREEN** | ✅ ugreen-nas | `/volume1` | 1001:1000 | UGOS compatibility |
-| **QNAP** | ✅ qpkg_cli | `/share` | 1000:1000 | Container Station support |
-| **TrueNAS** | ✅ midclt | `/mnt` | 1000:1000 | Scale & Core support |
-| **Unraid** | ✅ os-release | `/mnt/user` | 99:100 | User shares integration |
-| **Proxmox** | ✅ pveversion | `/opt/homelab` | 1000:1000 | LXC & VM support |
-| **Windows** | ✅ WSL/Git Bash | `/c/homelab` | 1000:1000 | WSL2 integration |
-| **macOS** | ✅ Darwin | `~/homelab` | 1000:1000 | Intel & M1/M2 support |
-| **Linux** | ✅ Generic | `/opt/homelab` | 1000:1000 | All distributions |
+| **Synology** | synoinfo | `/volume1` | 1026:100 | Container Manager support |
+| **UGREEN** | ugreen-nas | `/volume1` | 1001:1000 | UGOS compatibility |
+| **QNAP** | qpkg_cli | `/share` | 1000:1000 | Container Station support |
+| **TrueNAS** | midclt | `/mnt` | 1000:1000 | Scale & Core support |
+| **Unraid** | os-release | `/mnt/user` | 99:100 | User shares integration |
+| **Proxmox** | pveversion | `/opt/homelab` | 1000:1000 | LXC & VM support |
+| **Windows** | WSL/Git Bash | `/c/homelab` | 1000:1000 | WSL2 integration |
+| **macOS** | Darwin | `~/homelab` | 1000:1000 | Intel & M1/M2 support |
+| **Linux** | Generic | `/opt/homelab` | 1000:1000 | All distributions |
 
 ### 🛡️ `healthcheck.sh`
 **Purpose**: Monitor system health and VPN protection
@@ -94,11 +94,11 @@ wsl
 ```
 
 **Features:**
-- ✅ VPN leak detection (critical for privacy)
-- ✅ Container health monitoring
-- ✅ Resource usage tracking
-- ✅ Webhook notifications
-- ✅ Exit codes for automation
+- VPN leak detection (critical for privacy)
+- Container health monitoring
+- Resource usage tracking
+- Webhook notifications
+- Exit codes for automation
 
 **Automation Example:**
 ```bash
@@ -122,11 +122,11 @@ wsl
 ```
 
 **Features:**
-- ✅ Configuration file backups
-- ✅ Service database backups (Plex, Sonarr, Radarr, etc.)
-- ✅ FileBot license and configuration
-- ✅ Automatic cleanup of old backups
-- ✅ Backup verification and restoration info
+- Configuration file backups
+- Service database backups (Plex, Sonarr, Radarr, etc.)
+- FileBot license and configuration
+- Automatic cleanup of old backups
+- Backup verification and restoration info
 
 **What Gets Backed Up:**
 - **Config Only**: Environment files, Docker configs, scripts (~100MB)
@@ -148,13 +148,13 @@ wsl
 ```
 
 **Features:**
-- ✅ **Complete cleanup** - Removes all containers, networks, and volumes
-- ✅ **Network removal** - Cleans up servarr-network and streamarr-network
-- ✅ **File cleanup** - Removes generated environment files and backups
-- ✅ **Data preservation** - Keeps your media files and project files safe
-- ✅ **Safety prompts** - Confirms actions before destructive operations
-- ✅ **Beautiful UI** - Colored output and progress indicators
-- ✅ **Conflict resolution** - Handles leftover networks and containers
+- **Complete cleanup** - Removes all containers, networks, and volumes
+- **Network removal** - Cleans up servarr-network and streamarr-network
+- **File cleanup** - Removes generated environment files and backups
+- **Data preservation** - Keeps your media files and project files safe
+- **Safety prompts** - Confirms actions before destructive operations
+- **Beautiful UI** - Colored output and progress indicators
+- **Conflict resolution** - Handles leftover networks and containers
 
 **What Gets Removed:**
 - **Containers**: All servarr and streamarr stack containers
@@ -205,12 +205,12 @@ New-Item -ItemType Directory -Path "C:\homelab\data\downloads\complete" -Force
 ## 🎯 Why This Universal Approach?
 
 **Unified Philosophy:**
-- ✅ **Single script for all platforms** - No more platform-specific confusion
-- ✅ **Intelligent auto-detection** - Works out of the box on most systems
-- ✅ **Manual override capability** - Full control when needed
-- ✅ **Platform-optimized defaults** - Best practices for each system
-- ✅ **Comprehensive error handling** - Clear guidance when things go wrong
-- ✅ **Beautiful user interface** - Colored output and progress indicators
+- **Single script for all platforms** - No more platform-specific confusion
+- **Intelligent auto-detection** - Works out of the box on most systems
+- **Manual override capability** - Full control when needed
+- **Platform-optimized defaults** - Best practices for each system
+- **Comprehensive error handling** - Clear guidance when things go wrong
+- **Beautiful user interface** - Colored output and progress indicators
 
 **Inspired by TRaSH-Guides syno-script but enhanced for modern homelab setups!**
 
@@ -239,10 +239,10 @@ wsl --exec ./scripts/setup.sh
 ```
 
 ### 3. **Follow Interactive Prompts**
-- ✅ Platform detection/selection
-- ✅ Path configuration
-- ✅ Automatic setup
-- ✅ Optional deployment
+- Platform detection/selection
+- Path configuration
+- Automatic setup
+- Optional deployment
 
 ### 4. **Configure VPN** (Critical!)
 ```bash
@@ -262,7 +262,7 @@ docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
 ### 5. **Access Your Services**
 The script will display all service URLs customized for your platform!
 
-## 📊 Script Comparison
+## Script Comparison
 
 | Feature | setup.sh | healthcheck.sh | backup.sh |
 |---------|----------|----------------|-----------|

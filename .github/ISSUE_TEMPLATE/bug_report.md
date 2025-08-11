@@ -63,7 +63,7 @@ PLEX_ADVERTISE_URL=http://192.168.1.100:32400
 **Relevant docker-compose sections:**
 If you've modified any docker-compose files, include the relevant sections.
 
-## 📋 Service Status
+## Service Status
 
 **Container status:**
 ```bash
@@ -114,7 +114,7 @@ abc123def456   ghcr.io/hotio/plex      Up 2 hours (healthy)
 
 </details>
 
-## 🔍 Additional Context
+## Additional Context
 
 **When did this issue start?**
 - [ ] Fresh installation
@@ -141,7 +141,7 @@ Have you found any temporary workarounds for this issue?
 **Related issues:**
 Are there any related issues or similar problems you've found?
 
-## ✅ Troubleshooting Steps Attempted
+## Troubleshooting Steps Attempted
 
 Please check off the troubleshooting steps you've already tried:
 

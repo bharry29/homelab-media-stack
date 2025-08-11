@@ -189,7 +189,7 @@ Closes #456
 - [ ] Verify commands work with platform defaults
 - [ ] Document any platform-specific requirements or limitations
 
-## 📋 Pull Request Process
+## Pull Request Process
 
 ### Before Creating PR
 
@@ -375,7 +375,7 @@ Current maintainers:
 4. **Follow the guidelines** above
 5. **Submit your contribution**
 
-Thank you for helping make the Homelab Media Stack better for everyone! 🎉
+Thank you for helping make the Homelab Media Stack better for everyone!
 
 ---
 

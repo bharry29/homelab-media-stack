@@ -1,6 +1,6 @@
 # Pull Request
 
-## 📋 Summary
+## Summary
 
 **What does this PR do?**
 A clear and concise description of what this pull request accomplishes.
@@ -168,7 +168,7 @@ NEW_FEATURE_ENABLED=true
 NEW_FEATURE_CONFIG=custom_setting
 ```
 
-## 🔍 Code Quality
+## Code Quality
 
 ### Code Standards
 **Standards followed:**
@@ -187,7 +187,7 @@ NEW_FEATURE_CONFIG=custom_setting
 - [ ] VPN security not compromised
 - [ ] Container security best practices followed
 
-## 📋 Checklist
+## Checklist
 
 ### Pre-submission Checklist
 **Before submitting this PR:**
@@ -295,6 +295,6 @@ Are there specific areas where you'd like community feedback or suggestions?
 
 ---
 
-**Thank you for contributing to the Homelab Media Stack! Your efforts help make this project better for everyone. 🎉**
+**Thank you for contributing to the Homelab Media Stack! Your efforts help make this project better for everyone.**
 
 *💡 Remember: High-quality PRs with complete descriptions and testing get reviewed and merged faster!*

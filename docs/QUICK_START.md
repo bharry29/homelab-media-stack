@@ -1,7 +1,7 @@
 Quick Start Guide
 This guide will get your Homelab Media Stack running in under 30 minutes.
 
-⚡ Prerequisites Check
+Prerequisites Check
 Before starting, ensure you have:
 
  Docker & Docker Compose installed and running
@@ -138,9 +138,9 @@ Replace your-server-ip with your actual server IP address:
 🏠 Homarr Dashboard: http://your-server-ip:7575
 ⬇️ qBittorrent: http://your-server-ip:8080
 🎬 Plex: http://your-server-ip:32400/web
-📱 Overseerr: http://your-server-ip:5055
-📺 Sonarr: http://your-server-ip:8989
-🎥 Radarr: http://your-server-ip:7878
+Overseerr: http://your-server-ip:5055
+Sonarr: http://your-server-ip:8989
+Radarr: http://your-server-ip:7878
 2. Configure qBittorrent (5 minutes)
 1. Go to http://your-server-ip:8080
 2. Login: admin / adminadmin
@@ -191,7 +191,7 @@ Replace your-server-ip with your actual server IP address:
    - Server: http://your-server-ip:7878
    - API Key: [from Radarr setup]
    - Test and Save
-✅ Test Your Complete Setup
+Test Your Complete Setup
 End-to-End Test (The Fun Part!)
 1. Go to Overseerr: http://your-server-ip:5055
 2. Search for a popular movie (e.g., "The Matrix")
@@ -209,7 +209,7 @@ docker exec qbittorrent curl -s ifconfig.me
 # Should show VPN IP (different from your home IP)
 
 # If this shows your real IP, STOP and troubleshoot VPN before proceeding
-🚨 Quick Troubleshooting
+Quick Troubleshooting
 VPN Not Working?
 bash
 # Check VPN logs
@@ -239,14 +239,14 @@ chown -R 1001:1000 /volume1/docker /volume1/data
 
 # Check current permissions
 ls -la /volume1/data/downloads/
-🎉 You're Ready!
+You're Ready!
 Once everything is working:
 
 Main Services:
 🏠 Homarr Dashboard: http://your-server-ip:7575 (overview of everything)
 🎬 Plex Media Server: http://your-server-ip:32400/web (watch your content)
-📱 Overseerr: http://your-server-ip:5055 (request new content)
-📊 Tautulli: http://your-server-ip:8181 (viewing statistics)
+Overseerr: http://your-server-ip:5055 (request new content)
+Tautulli: http://your-server-ip:8181 (viewing statistics)
 Family Usage:
 Family requests content via Overseerr on their phones
 System automatically downloads and organizes everything

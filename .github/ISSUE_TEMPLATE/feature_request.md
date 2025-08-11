@@ -14,7 +14,7 @@ A clear and concise description of the feature or enhancement you're requesting.
 **Problem or use case:**
 What problem does this feature solve? What use case does it enable?
 
-## 📋 Detailed Description
+## Detailed Description
 
 ### Current Situation
 **What is the current behavior or limitation?**
@@ -127,7 +127,7 @@ How would users interact with this new feature?
 **Learning curve:**
 How easy would this be for new users to understand and use?
 
-## 📊 Alternatives Considered
+## Alternatives Considered
 
 ### Alternative solutions
 **Option 1:**
@@ -146,7 +146,7 @@ Do other similar projects have this feature? How do they implement it?
 **Industry standards:**
 Are there established patterns or standards for this type of feature?
 
-## 🔍 Research & References
+## Research & References
 
 ### Supporting evidence
 **Community requests:**
