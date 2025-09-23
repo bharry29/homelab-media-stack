@@ -438,6 +438,7 @@ services:
     # Action:   move (saves disk space)
     # Conflict: auto (replace if better quality)
     # Clean:    yes (remove leftover files)
+    # Enhanced sorting: UHD/QHD → UHD folder, FHD/HD → HD folder, others → SD folder
     command: >
       /data_path/downloads/complete
       --output /media_data_path/
@@ -446,7 +447,7 @@ services:
       -non-strict
       --log-file /data/amc.log
       --def excludeList=/data/amc-exclude-list.txt
-      --def unsorted=y music=y artwork=y clean=y movieDB=TheMovieDB seriesDB=TheMovieDB::TV animeDB=TheMovieDB::TV musicDB=ID3 movieFormat="/media_data_path/Movies/{hd ==~ /UHD|QHD/ ? "UHD" : hd ==~ /FHD|HD/ ? "HD" : "SD"}/{info.OriginalLanguage}/{~plex}" animeFormat="/media_data_path/Anime/{info.OriginalLanguage}/{~plex}" seriesFormat="/media_data_path/TV Shows/{info.OriginalLanguage}/{~plex}" unsortedFormat="/media_data_path/Unsorted/" "ut_label=%L" "ut_title=%N" "ut_kind=multi" "ut_dir=%F"
+      --def unsorted=y music=y artwork=y clean=y movieDB=TheMovieDB seriesDB=TheMovieDB::TV animeDB=TheMovieDB::TV musicDB=ID3 movieFormat="/media_data_path/{hd ==~ /UHD|QHD/ ? "UHD" : hd ==~ /FHD|HD/ ? "HD" : "SD"}/{info.OriginalLanguage}/{~plex}" animeFormat="/media_data_path/Anime/{info.OriginalLanguage}/{~plex}" seriesFormat="/media_data_path/TV Shows/{info.OriginalLanguage}/{~plex}" unsortedFormat="/media_data_path/Unsorted/" "ut_label=%L" "ut_title=%N" "ut_kind=multi" "ut_dir=%F"
       --def plex=${PLEX_TOKEN}
       --def discord=${DISCORD_WEBHOOK}
     
@@ -520,6 +521,42 @@ services:
     # Docker socket access for container management
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+
+  # Note: Portainer is managed separately via setup.sh
+
+  # ---------------------------------------------------------------------------
+  # SYSTEM MONITORING
+  # ---------------------------------------------------------------------------
+  # Uptime Kuma - System monitoring and uptime tracking
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: uptime-kuma
+    hostname: uptime-kuma
+    restart: unless-stopped
+    
+    # Direct network access
+    networks:
+      servarr-network:
+        ipv4_address: 172.39.0.12
+    
+    # External access to web interface
+    ports:
+      - "${UPTIME_KUMA_PORT:-3001}:3001"
+    
+    # User and system configuration
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    
+    # Persistent storage
+    volumes:
+      - ${SERVARR_CONFIG_PATH}/uptime-kuma:/app/data
+      - /etc/localtime:/etc/localtime:ro
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
 
 # =============================================================================
 # END OF SERVARR STACK CONFIGURATION

@@ -431,12 +431,20 @@ create_directories_for_platform() {
     directories=(
         "${base_path}/docker/servarr"
         "${base_path}/docker/streamarr"
+        "${base_path}/docker/creatarr"
         "${base_path}/data/downloads/complete"
         "${base_path}/data/downloads/incomplete"
         "${base_path}/data/media/movies"
         "${base_path}/data/media/tv"
         "${base_path}/data/media/music"
         "${base_path}/data/plex_transcode"
+        "${base_path}/data/roms"
+        "${base_path}/data/comics"
+        "${base_path}/data/audiobooks"
+        "${base_path}/data/podcasts"
+        "${base_path}/data/books"
+        "${base_path}/data/recipes"
+        "${base_path}/data/saves"
     )
     
     # Create directories with progress
@@ -972,6 +980,67 @@ configure_vpn_settings() {
     fi
 }
 
+configure_n8n_encryption() {
+    printf '\n%b\n' " ${uyc} Configuring n8n encryption key..."
+    
+    # Ask user about HTTPS setup
+    printf '\n%b\n' " ${cy}n8n Encryption Key Configuration:${cend}"
+    printf '\n%b\n' " ${clc}•${cend} For HTTPS/domain access: Encryption key is required"
+    printf '\n%b\n' " ${clc}•${cend} For HTTP/local access: Encryption key is optional"
+    
+    printf '\n%b\n' " ${uyc} Will you be using n8n with HTTPS/domain access? [y/N]: "
+    read -r use_https
+    
+    if [[ "$use_https" =~ ^[Yy]$ ]]; then
+        printf '\n%b\n' " ${cy}HTTPS Setup Selected${cend}"
+        printf '\n%b\n' " ${uyc} You have two options for the encryption key:"
+        printf '\n%b\n' " ${clc}1)${cend} Generate a new random key (recommended)"
+        printf '\n%b\n' " ${clc}2)${cend} Use an existing key from n8n config"
+        
+        printf '\n%b\n' " ${uyc} Choose option [1-2] (default: 1): "
+        read -r key_option
+        key_option="${key_option:-1}"
+        
+        case "$key_option" in
+            1)
+                # Generate new random key
+                if command -v openssl >/dev/null 2>&1; then
+                    n8n_encryption_key=$(openssl rand -base64 32)
+                    printf '\n%b\n' " ${utick} Generated new encryption key: ${clc}${n8n_encryption_key}${cend}"
+                else
+                    # Fallback if openssl not available
+                    n8n_encryption_key=$(head -c 32 /dev/urandom | base64)
+                    printf '\n%b\n' " ${utick} Generated new encryption key: ${clc}${n8n_encryption_key}${cend}"
+                fi
+                ;;
+            2)
+                # Use existing key
+                printf '\n%b\n' " ${uyc} Enter your existing n8n encryption key:"
+                printf '%b' " ${uyc} Encryption Key: "
+                read -r n8n_encryption_key
+                if [[ -z "$n8n_encryption_key" ]]; then
+                    printf '\n%b\n' " ${ucross} Encryption key cannot be empty"
+                    return 1
+                fi
+                printf '\n%b\n' " ${utick} Using provided encryption key"
+                ;;
+            *)
+                printf '\n%b\n' " ${ucross} Invalid option, generating new key"
+                n8n_encryption_key=$(openssl rand -base64 32 2>/dev/null || head -c 32 /dev/urandom | base64)
+                ;;
+        esac
+        
+        # Store the key for later use
+        declare -g n8n_encryption_key
+        printf '\n%b\n' " ${cy}IMPORTANT:${cend} Save this encryption key securely!"
+        printf '\n%b\n' " ${clc}Key:${cend} ${n8n_encryption_key}"
+        printf '\n%b\n' " ${uyc} This key will be used in your n8n configuration"
+    else
+        printf '\n%b\n' " ${uyc} HTTP/Local setup selected - encryption key not required"
+        n8n_encryption_key=""
+    fi
+}
+
 configure_environment_files() {
     printf '\n%b\n' " ${uyc} Configuring environment files..."
     show_loading_message "Configuring application settings" 1
@@ -1029,8 +1098,40 @@ configure_environment_files() {
         printf '\n%b\n' " ${uyc} .env-streamarr already exists, skipping"
     fi
     
+    # Configure creatarr environment
+    if [[ ! -f ".env-creatarr" ]]; then
+        if [[ -f ".env-creatarr.example" ]]; then
+            cp ".env-creatarr.example" ".env-creatarr"
+            
+            # Update paths based on platform
+            if [[ "$platform" == "windows" ]]; then
+                # Convert Windows path to Unix-style for Docker
+                unix_path="${base_path//\\//}"
+                sed -i.bak "s|/volume1|${unix_path}|g" ".env-creatarr"
+            else
+                sed -i.bak "s|/volume1|${base_path}|g" ".env-creatarr"
+            fi
+            
+            sed -i.bak "s|PUID=1000|PUID=${puid}|g" ".env-creatarr"
+            sed -i.bak "s|PGID=1000|PGID=${pgid}|g" ".env-creatarr"
+            sed -i.bak "s|TZ=Etc/UTC|TZ=${timezone}|g" ".env-creatarr"
+            
+            # Set n8n encryption key if provided
+            if [[ -n "$n8n_encryption_key" ]]; then
+                sed -i.bak "s|N8N_ENCRYPTION_KEY=.*|N8N_ENCRYPTION_KEY=${n8n_encryption_key}|g" ".env-creatarr"
+                printf '\n%b\n' " ${utick} Set n8n encryption key in .env-creatarr"
+            fi
+            
+            printf '\n%b\n' " ${utick} Created .env-creatarr with ${platform} settings"
+        else
+            printf '\n%b\n' " ${ucross} Warning: .env-creatarr.example not found"
+        fi
+    else
+        printf '\n%b\n' " ${uyc} .env-creatarr already exists, skipping"
+    fi
+    
     # Clean up backup files
-    rm -f ".env-servarr.bak" ".env-streamarr.bak" 2>/dev/null || true
+    rm -f ".env-servarr.bak" ".env-streamarr.bak" ".env-creatarr.bak" 2>/dev/null || true
     
     printf '\n%b\n' " ${utick} Environment files configured!"
 }
@@ -1076,7 +1177,7 @@ deploy_stacks() {
     
     if $compose_cmd --env-file .env-servarr -f docker-compose-servarr.yml up -d; then
         printf '\n%b\n' " ${utick} SERVARR stack deployed successfully!"
-        printf '\n%b\n' " ${uyc} Services: Gluetun (VPN), qBittorrent, SABnzbd, Prowlarr, Sonarr, Radarr, Lidarr, Bazarr, FileBot, Homarr"
+        printf '\n%b\n' " ${uyc} Services: Gluetun (VPN), qBittorrent, SABnzbd, Prowlarr, Sonarr, Radarr, Lidarr, Bazarr, FileBot, Homarr, Uptime Kuma"
     else
         printf '\n%b\n' " ${ucross} Failed to deploy SERVARR stack"
         return 1
@@ -1107,10 +1208,29 @@ deploy_stacks() {
     
     if $compose_cmd --env-file .env-streamarr -f docker-compose-streamarr.yml up -d; then
         printf '\n%b\n' " ${utick} STREAMARR stack deployed successfully!"
-        printf '\n%b\n' " ${uyc} Services: Plex Media Server, Overseerr, Tautulli, ErsatzTV"
-        return 0
+        printf '\n%b\n' " ${uyc} Services: Plex Media Server, Overseerr, Tautulli, ErsatzTV, Navidrome"
     else
         printf '\n%b\n' " ${ucross} Failed to deploy STREAMARR stack"
+        return 1
+    fi
+    
+    # Deploy CREATARR stack (creative content & family life)
+    printf '\n%b\n' "${clm}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+    printf '\n%b\n' "${clm}║                                                                               ║${cend}"
+    printf '\n%b\n' "${clm}║                    DEPLOYING CREATARR STACK                                   ║${cend}"
+    printf '\n%b\n' "${clm}║                                                                               ║${cend}"
+    printf '\n%b\n' "${clm}║                    (Creative Content & Family Life)                          ║${cend}"
+    printf '\n%b\n' "${clm}║                                                                               ║${cend}"
+    printf '\n%b\n' "${clm}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+    
+    show_loading_message "Launching CREATARR services (n8n, Mealie, Noisedash, Swing Music, RetroArch, Komga, Audiobookshelf, Calibre-Web)" 3
+    
+    if $compose_cmd --env-file .env-creatarr -f docker-compose-creatarr.yml up -d; then
+        printf '\n%b\n' " ${utick} CREATARR stack deployed successfully!"
+        printf '\n%b\n' " ${uyc} Services: n8n, Mealie, Noisedash, Swing Music, RetroArch, Komga, Audiobookshelf, Calibre-Web"
+        return 0
+    else
+        printf '\n%b\n' " ${ucross} Failed to deploy CREATARR stack"
         return 1
     fi
 }
@@ -1140,6 +1260,8 @@ show_access_info() {
     printf '\n%b\n' " ${clc}Lidarr:${cend} http://${local_ip}:8686"
     printf '\n%b\n' " ${clc}Bazarr:${cend} http://${local_ip}:6767"
     printf '\n%b\n' " ${clc}FileBot:${cend} http://${local_ip}:5452"
+    printf '\n%b\n' " ${clc}Portainer:${cend} http://${local_ip}:9000"
+    printf '\n%b\n' " ${clc}Uptime Kuma:${cend} http://${local_ip}:3001"
     
     printf '\n%b\n' "${clb}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
     printf '\n%b\n' "${clb}║                                                                               ║${cend}"
@@ -1151,6 +1273,22 @@ show_access_info() {
     printf '\n%b\n' " ${clc}Overseerr:${cend} http://${local_ip}:5055"
     printf '\n%b\n' " ${clc}Tautulli:${cend} http://${local_ip}:8181"
     printf '\n%b\n' " ${clc}ErsatzTV:${cend} http://${local_ip}:8409"
+    printf '\n%b\n' " ${clc}Navidrome:${cend} http://${local_ip}:4533"
+    
+    printf '\n%b\n' "${clm}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+    printf '\n%b\n' "${clm}║                                                                               ║${cend}"
+    printf '\n%b\n' "${clm}║                    CREATARR STACK (Creative Content & Family Life)           ║${cend}"
+    printf '\n%b\n' "${clm}║                                                                               ║${cend}"
+    printf '\n%b\n' "${clm}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+    
+    printf '\n%b\n' " ${clc}n8n Workflows:${cend} http://${local_ip}:5678"
+    printf '\n%b\n' " ${clc}Mealie Recipes:${cend} http://${local_ip}:9001"
+    printf '\n%b\n' " ${clc}Noisedash:${cend} http://${local_ip}:3002"
+    printf '\n%b\n' " ${clc}Swing Music:${cend} http://${local_ip}:1970"
+    printf '\n%b\n' " ${clc}RetroArch Gaming:${cend} http://${local_ip}:8081"
+    printf '\n%b\n' " ${clc}Komga Comics:${cend} http://${local_ip}:25600"
+    printf '\n%b\n' " ${clc}Audiobookshelf:${cend} http://${local_ip}:13378"
+    printf '\n%b\n' " ${clc}Calibre-Web:${cend} http://${local_ip}:8083"
     
     printf '\n%b\n' " ${uyc} ${cy}Next Steps:${cend}"
     printf '\n%b\n' " ${clc}1.${cend} Set up download clients in Sonarr/Radarr"
@@ -1158,6 +1296,10 @@ show_access_info() {
     printf '\n%b\n' " ${clc}3.${cend} Configure Plex libraries"
     printf '\n%b\n' " ${clc}4.${cend} Set up Overseerr for requests"
     printf '\n%b\n' " ${clc}5.${cend} Configure FileBot for media organization"
+    printf '\n%b\n' " ${clc}6.${cend} Upload ROMs to ${base_path}/data/roms/"
+    printf '\n%b\n' " ${clc}7.${cend} Upload comics to ${base_path}/data/comics/"
+    printf '\n%b\n' " ${clc}8.${cend} Upload audiobooks to ${base_path}/data/audiobooks/"
+    printf '\n%b\n' " ${clc}9.${cend} Upload ebooks to ${base_path}/data/books/"
     
     printf '\n%b\n' " ${uyc} ${cy}Platform-specific notes for ${clc}${platform}${cy}:${cend}"
     case "$platform" in
@@ -1245,10 +1387,17 @@ cleanup_failed_installation() {
             $compose_cmd --env-file .env-streamarr -f docker-compose-streamarr.yml down --remove-orphans 2>/dev/null || true
         fi
         
+        # Stop creatarr stack if it exists
+        if [[ -f "docker-compose-creatarr.yml" ]] && [[ -f ".env-creatarr" ]]; then
+            $compose_cmd --env-file .env-creatarr -f docker-compose-creatarr.yml down --remove-orphans 2>/dev/null || true
+        fi
+        
         # Remove any related containers
         local related_containers=(
             "gluetun" "qbittorrent" "sabnzbd" "sonarr" "radarr" "lidarr" "bazarr" "prowlarr"
-            "plex" "tautulli" "overseerr" "homarr" "ersatztv" "filebot"
+            "plex" "tautulli" "overseerr" "homarr" "ersatztv" "filebot" "navidrome"
+            "n8n" "n8n-postgres" "mealie" "mealie-db" "noisedash" "swing-music" "retroarch"
+            "komga" "audiobookshelf" "calibre-web"
         )
         
         for container in "${related_containers[@]}"; do
@@ -1258,12 +1407,13 @@ cleanup_failed_installation() {
         # Remove networks
         docker network rm servarr-network 2>/dev/null || true
         docker network rm streamarr-network 2>/dev/null || true
+        docker network rm creatarr-network 2>/dev/null || true
     fi
     
     # Remove generated environment files
     printf '\n%b\n' " ${uyc} Removing generated configuration files..."
-    rm -f ".env-servarr" ".env-streamarr" 2>/dev/null || true
-    rm -f ".env-servarr.bak" ".env-streamarr.bak" 2>/dev/null || true
+    rm -f ".env-servarr" ".env-streamarr" ".env-creatarr" 2>/dev/null || true
+    rm -f ".env-servarr.bak" ".env-streamarr.bak" ".env-creatarr.bak" 2>/dev/null || true
     
     # Remove directories if they were created and are empty
     if [[ -n "$base_path" ]] && [[ -d "$base_path" ]]; then
@@ -1273,12 +1423,20 @@ cleanup_failed_installation() {
         local created_dirs=(
             "${base_path}/docker/servarr"
             "${base_path}/docker/streamarr"
+            "${base_path}/docker/creatarr"
             "${base_path}/data/downloads/complete"
             "${base_path}/data/downloads/incomplete"
             "${base_path}/data/media/movies"
             "${base_path}/data/media/tv"
             "${base_path}/data/media/music"
             "${base_path}/data/plex_transcode"
+            "${base_path}/data/roms"
+            "${base_path}/data/comics"
+            "${base_path}/data/audiobooks"
+            "${base_path}/data/podcasts"
+            "${base_path}/data/books"
+            "${base_path}/data/recipes"
+            "${base_path}/data/saves"
         )
         
         # Remove empty directories (in reverse order to handle nested dirs)
@@ -1322,7 +1480,7 @@ cleanup_failed_installation() {
     
     printf '\n%b\n' " ${uyc} ${cy}What was cleaned up:${cend}"
     printf '\n%b\n' " ${clc}•${cend} All Docker containers and networks"
-    printf '\n%b\n' " ${clc}•${cend} Generated environment files (.env-servarr, .env-streamarr)"
+    printf '\n%b\n' " ${clc}•${cend} Generated environment files (.env-servarr, .env-streamarr, .env-creatarr)"
     printf '\n%b\n' " ${clc}•${cend} Empty directories created during setup"
     
     printf '\n%b\n' " ${uyc} ${cy}What was preserved:${cend}"
@@ -1423,6 +1581,12 @@ main() {
         printf '\n%b\n' " ${uyc} You can configure VPN settings manually later"
     fi
     
+    # Configure n8n encryption key
+    if ! configure_n8n_encryption; then
+        printf '\n%b\n' " ${uyc} n8n encryption configuration failed, but continuing with setup..."
+        printf '\n%b\n' " ${uyc} You can configure n8n encryption manually later"
+    fi
+    
     # Fix permissions before deployment
     fix_permissions
     
@@ -1440,12 +1604,14 @@ main() {
             printf '\n%b\n' " ${uyc} You can try deploying manually using:"
             printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-servarr -f docker-compose-servarr.yml up -d${cend}"
             printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-streamarr -f docker-compose-streamarr.yml up -d${cend}"
+            printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-creatarr -f docker-compose-creatarr.yml up -d${cend}"
             exit 1
         fi
     else
         printf '\n%b\n' " ${uyc} Setup complete! You can deploy later using:"
         printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-servarr -f docker-compose-servarr.yml up -d${cend}"
         printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-streamarr -f docker-compose-streamarr.yml up -d${cend}"
+        printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-creatarr -f docker-compose-creatarr.yml up -d${cend}"
     fi
     
     printf '\n%b\n' " ${utick} ${clg}Homelab Media Stack setup complete!${cend}"

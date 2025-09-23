@@ -1,25 +1,35 @@
 # Homelab Media Stack
 
-A comprehensive, production-ready Docker-based media automation stack for home servers and NAS systems. This project provides a complete solution for automated media acquisition, processing, and streaming with enterprise-grade security through VPN integration.
+A comprehensive, production-ready Docker-based media automation stack for home servers and NAS systems. This project provides a complete solution for automated media acquisition, processing, streaming, and creative content management with enterprise-grade security through VPN integration.
+
+> **🚀 This project is actively growing!** We're continuously adding new services, stacks, and features. The current version includes 3 main stacks with 28 services, and we're planning to add more creative tools, productivity apps, and automation services.
 
 ## Architecture Overview
 
-This stack uses a **dual-stack architecture** with proper network isolation and shared data volumes:
+This stack uses a **multi-stack architecture** with proper network isolation and shared data volumes:
 
 ### **SERVARR STACK** (Download & Management)
 - **Network**: `172.39.0.0/24` (isolated)
 - **Purpose**: Handles all download and media management operations
 - **VPN Protection**: All download traffic routed through Gluetun VPN gateway
+- **Services**: 13 containers including VPN, downloaders, *arr apps, and monitoring
 
 ### **STREAMARR STACK** (Streaming & Requests)
 - **Network**: `172.40.0.0/24` (isolated) 
 - **Purpose**: Handles media streaming and user request management
 - **Data Access**: Read-only access to organized media files
+- **Services**: 5 containers including Plex, request management, and analytics
+
+### **CREATARR STACK** (Creative & Productivity) 🆕
+- **Network**: `172.41.0.0/24` (isolated)
+- **Purpose**: Creative content creation, family management, and productivity tools
+- **Services**: 10 containers including workflow automation, recipe management, music creation, gaming, and databases
+- **Features**: n8n workflows, Mealie recipes, Noisedash ambient sounds, Swing Music player, and more
 
 ### **Shared Integration**
-- **Data Volume**: `/volume1/data` shared between both stacks
+- **Data Volume**: `/volume1/data` shared between all stacks
 - **Communication**: Inter-stack communication via host networking
-- **Processing Flow**: Downloads → FileBot Processing → Organized Media → Streaming
+- **Processing Flow**: Downloads → FileBot Processing → Organized Media → Streaming + Creative Tools
 
 ## Stack Components
 
@@ -38,6 +48,7 @@ This stack uses a **dual-stack architecture** with proper network isolation and 
 | **FileBot Node** | File Processing UI | 5452 | Direct |
 | **FileBot Watcher** | Auto File Processing | - | Internal |
 | **Homarr** | Service Dashboard | 7575 | Direct |
+| **Uptime Kuma** | System Monitoring | 3001 | Direct |
 | **Watchtower** | Auto Updates | - | Internal |
 
 ### STREAMARR STACK Services
@@ -48,6 +59,22 @@ This stack uses a **dual-stack architecture** with proper network isolation and 
 | **Overseerr** | Request Management | 5055 | Direct |  
 | **Tautulli** | Analytics & Monitoring | 8181 | Direct |
 | **ErsatzTV** | Virtual TV Channels | 8409 | Direct |
+| **Navidrome** | Music Streaming Server | 4533 | Direct |
+
+### CREATARR STACK Services 🆕
+
+| Service | Purpose | Port | Network |
+|---------|---------|------|---------|
+| **n8n** | Workflow Automation | 5678 | Direct |
+| **n8n-postgres** | n8n Database | 5432 | Internal |
+| **Mealie** | Recipe Management | 9001 | Direct |
+| **mealie-db** | Mealie Database | 5432 | Internal |
+| **Noisedash** | Ambient Sound Generator | 3002 | Direct |
+| **Swing Music** | Music Player | 1970 | Direct |
+| **RetroArch** | Gaming Emulator | 8081 | Direct |
+| **Komga** | Comic Book Server | 25600 | Direct |
+| **Audiobookshelf** | Audiobook Server | 13378 | Direct |
+| **Calibre-Web** | E-book Management | 8083 | Direct |
 
 ## Prerequisites
 
@@ -100,7 +127,7 @@ sudo ./scripts/setup.sh
 - Configure environment files with your system settings
 - Handle Docker networks automatically (no conflicts!)
 - Set up VPN protection with interactive provider selection
-- Deploy both stacks (SERVARR and STREAMARR) separately
+- Deploy all three stacks (SERVARR, STREAMARR, and CREATARR) separately
 - Show all service URLs for easy access
 - Validate VPN protection and security
 - Automatic cleanup on any failure (removes all created files)
@@ -167,6 +194,7 @@ Creating directory structure...
 Configuring environment files...
 .env-servarr configured
 .env-streamarr configured
+.env-creatarr configured
 
 Configuring VPN settings for Gluetun...
 
@@ -220,7 +248,16 @@ VPN is working! External IP: 185.xxx.xxx.xxx
 
 [████████████████████] 100% Complete
 STREAMARR stack deployed successfully!
-Services: Plex Media Server, Overseerr, Tautulli, ErsatzTV
+Services: Plex Media Server, Overseerr, Tautulli, ErsatzTV, Navidrome
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                       DEPLOYING CREATARR STACK                               ║
+║                    (Creative & Productivity Services)                         ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+[████████████████████] 100% Complete
+CREATARR stack deployed successfully!
+Services: n8n, Mealie, Noisedash, Swing Music, RetroArch
 
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                             SETUP COMPLETE!                                   ║
@@ -249,6 +286,20 @@ Plex Media Server:   http://192.168.1.100:32400/web
 Overseerr:           http://192.168.1.100:5055
 Tautulli:            http://192.168.1.100:8181
 ErsatzTV:            http://192.168.1.100:8409
+Navidrome:           http://192.168.1.100:4533
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                        CREATARR STACK (Creative & Productivity) 🆕           ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+n8n Workflows:      http://192.168.1.100:5678
+Mealie Recipes:     http://192.168.1.100:9001
+Noisedash:          http://192.168.1.100:3002
+Swing Music:        http://192.168.1.100:1970
+RetroArch Gaming:   http://192.168.1.100:8081
+Komga Comics:       http://192.168.1.100:25600
+Audiobookshelf:     http://192.168.1.100:13378
+Calibre-Web:        http://192.168.1.100:8083
 
 Next Steps:
 1. Set up download clients in Sonarr/Radarr
@@ -256,6 +307,12 @@ Next Steps:
 3. Configure Plex libraries
 4. Set up Overseerr for requests
 5. Configure FileBot for media organization
+6. Create n8n workflows for automation
+7. Add recipes to Mealie
+8. Set up music libraries in Swing Music
+9. Upload comics to Komga
+10. Add audiobooks to Audiobookshelf
+11. Import e-books to Calibre-Web
 
 For detailed configuration guide: docs/QUICK_START.md
 
@@ -280,7 +337,7 @@ cd homelab-media-stack
 **Linux/Mac/NAS Command Line:**
 ```bash
 # Create base directories
-mkdir -p /volume1/docker/{servarr,streamarr}
+mkdir -p /volume1/docker/{servarr,streamarr,creatarr}
 mkdir -p /volume1/data/{downloads/{complete,incomplete},media/{movies,tv,music},plex_transcode}
 
 # Set permissions (adjust PUID/PGID for your system)
@@ -290,7 +347,7 @@ chown -R 1001:1000 /volume1/docker /volume1/data
 **NAS GUI (Synology, QNAP, Unraid):**
 1. **File Manager** → Create shared folder `docker`
 2. **File Manager** → Create shared folder `data`
-3. **Inside docker**: Create folders `servarr` and `streamarr`
+3. **Inside docker**: Create folders `servarr`, `streamarr`, and `creatarr`
 4. **Inside data**: Create folders:
    - `downloads` (with subfolders `complete` and `incomplete`)
    - `media` (with subfolders `movies`, `tv`, `music`)
@@ -301,10 +358,12 @@ chown -R 1001:1000 /volume1/docker /volume1/data
 # Copy example files
 cp .env-servarr.example .env-servarr
 cp .env-streamarr.example .env-streamarr
+cp .env-creatarr.example .env-creatarr
 
 # Edit with your settings
 nano .env-servarr
 nano .env-streamarr
+nano .env-creatarr
 ```
 
 #### **4. Deploy Stacks**
@@ -314,22 +373,32 @@ docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
 
 # Deploy STREAMARR stack (streaming & requests)
 docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
+
+# Deploy CREATARR stack (creative & productivity)
+docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml up -d
 ```
 
 ## Features
 
 ### **Core Capabilities**
 - **VPN Integration**: All download traffic protected through secure VPN
-- **Dual-Stack Architecture**: Separate networks for downloads and streaming
+- **Multi-Stack Architecture**: Separate networks for downloads, streaming, and creative tools
 - **Cross-Platform Support**: Works on Windows, macOS, Linux, and NAS systems
 - **Automated Setup**: One-command deployment with intelligent platform detection
 - **Professional UI**: Clean, modern web interfaces for all services
+- **Growing Ecosystem**: Continuously expanding with new services and features
 
 ### **Advanced Features**
-- **FileBot Integration**: Automated file organization and renaming
+- **FileBot Integration**: Automated file organization and renaming with intelligent quality-based sorting
+- **Smart Media Organization**: Automatic UHD/HD/SD categorization based on video resolution
 - **Request Management**: User-friendly interface via Overseerr
-- **Analytics**: Comprehensive monitoring via Tautulli
+- **Analytics**: Comprehensive monitoring via Tautulli and Uptime Kuma
 - **Virtual TV**: Create custom TV channels with ErsatzTV
+- **Workflow Automation**: n8n for complex automation workflows
+- **Recipe Management**: Mealie for family meal planning and recipes
+- **Creative Tools**: Noisedash for ambient sounds, Swing Music for local music
+- **Gaming**: RetroArch for retro gaming emulation
+- **Digital Libraries**: Komga for comics, Audiobookshelf for audiobooks, Calibre-Web for e-books
 - **Auto-Updates**: Automatic container updates via Watchtower
 - **Health Monitoring**: System health checks and notifications
 
@@ -358,6 +427,9 @@ docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
 
 # STREAMARR stack  
 docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
+
+# CREATARR stack
+docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml up -d
 ```
 
 **Stop all services:**
@@ -367,6 +439,9 @@ docker-compose --env-file .env-servarr -f docker-compose-servarr.yml down
 
 # STREAMARR stack
 docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml down
+
+# CREATARR stack
+docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml down
 ```
 
 **View logs:**
@@ -480,6 +555,164 @@ docker restart gluetun
 | `VPN connection failed` | Check credentials and provider settings |
 | `Container won't start` | Check logs: `docker logs container_name` |
 
+### **CREATARR Stack Troubleshooting** 🆕
+
+#### **n8n Issues**
+
+**Bad Gateway Error:**
+```bash
+# Check n8n container status
+docker ps | grep n8n
+docker logs n8n --tail 50
+
+# Check port mapping
+docker port n8n
+
+# Test direct access
+curl -I http://your-nas-ip:5678
+```
+
+**Database Connection Issues:**
+```bash
+# Check PostgreSQL container
+docker logs n8n-postgres
+
+# Test database connection
+docker exec n8n-postgres pg_isready -U n8n
+
+# Restart n8n if database is ready
+docker restart n8n
+```
+
+**n8n Deprecation Warnings:**
+The stack includes optimized settings to prevent these warnings:
+- `DB_SQLITE_POOL_SIZE=10` - Enables connection pooling
+- `N8N_RUNNERS_ENABLED=true` - Enables task runners
+- `N8N_BLOCK_ENV_ACCESS_IN_NODE=false` - Allows environment variable access
+
+#### **Mealie Issues**
+
+**Database "mealie" does not exist:**
+```bash
+# Check mealie-db container
+docker logs mealie-db
+
+# Restart mealie with database dependency
+docker restart mealie-db
+docker restart mealie
+```
+
+**Permission Issues:**
+```bash
+# Fix database directory permissions
+sudo chown -R 999:999 /volume1/docker/creatarr/mealie-db
+sudo chmod -R 700 /volume1/docker/creatarr/mealie-db
+```
+
+#### **Port Conflicts**
+
+**Common Port Conflicts:**
+- **Port 8080**: qBittorrent (SERVARR) vs RetroArch (CREATARR) → RetroArch moved to 8081
+- **Port 9000**: Portainer vs Mealie → Mealie moved to 9001
+- **Port 3000**: Uptime Kuma vs Noisedash → Noisedash moved to 3002
+
+**Check Port Usage:**
+```bash
+# Check what's using a specific port
+netstat -tlnp | grep :5678
+lsof -i :5678
+
+# Check all Docker port mappings
+docker ps --format "table {{.Names}}\t{{.Ports}}"
+```
+
+#### **Database Permission Issues**
+
+**PostgreSQL Permission Fix:**
+```bash
+# Set correct ownership for database directories
+sudo chown -R 999:999 /volume1/docker/creatarr/n8n-postgres
+sudo chown -R 999:999 /volume1/docker/creatarr/mealie-db
+
+# Set correct permissions
+sudo chmod -R 700 /volume1/docker/creatarr/n8n-postgres
+sudo chmod -R 700 /volume1/docker/creatarr/mealie-db
+```
+
+#### **n8n HTTPS/Domain Configuration**
+
+**For Custom Domain with HTTPS:**
+1. **Update .env-creatarr file:**
+```bash
+# n8n HTTPS/Domain Configuration
+N8N_SECURE_COOKIE=true
+N8N_EDITOR_BASE_URL=https://your-domain.com
+N8N_WEBHOOK_URL=https://your-domain.com
+N8N_PROTOCOL=https
+N8N_HOST=your-domain.com
+N8N_ENCRYPTION_KEY=your_encryption_key_here
+```
+
+2. **Generate Encryption Key:**
+```bash
+# Generate a random encryption key
+openssl rand -base64 32
+
+# Or use existing key from n8n config
+# Extract from: {"encryptionKey": "XLis7p0o1zKwDbgFU3uXNymkY13aY+8Z"}
+```
+
+3. **Key Management:**
+- **New Setup**: Use generated key from setup script
+- **Existing n8n**: Extract key from your n8n config file
+- **Key Location**: `~/.n8n/config` or `${CREATARR_CONFIG_PATH}/n8n/config`
+- **Key Format**: Base64 encoded string (32+ characters)
+
+4. **Configure Nginx Proxy Manager:**
+- **Domain Names**: `n8n.yourdomain.com`
+- **Forward Hostname/IP**: `172.41.0.11` (n8n container IP)
+- **Forward Port**: `5678`
+- **Block Common Exploits**: ✅ Enabled
+- **Websockets Support**: ✅ Enabled
+
+5. **n8n Encryption Key Helper:**
+```bash
+# Use the helper script for key management
+./scripts/n8n-key-helper.sh
+
+# Options available:
+# 1. Generate new encryption key
+# 2. Extract key from existing n8n config
+# 3. Use existing key file
+# 4. Manual key entry
+# 5. Show current key from .env-creatarr
+```
+
+#### **Service Health Checks**
+
+**Check All CREATARR Services:**
+```bash
+# Check all containers
+docker ps | grep creatarr
+
+# Check specific service logs
+docker logs n8n --tail 20
+docker logs mealie --tail 20
+docker logs noisedash --tail 20
+docker logs swing-music --tail 20
+docker logs retroarch --tail 20
+```
+
+**Test Service Access:**
+```bash
+# Test each service
+curl -I http://your-nas-ip:5678    # n8n
+curl -I http://your-nas-ip:9001    # Mealie
+curl -I http://your-nas-ip:3002    # Noisedash
+curl -I http://your-nas-ip:1970    # Swing Music
+curl -I http://your-nas-ip:8081    # RetroArch
+```
+
 ### **Manual Recovery**
 
 If scripts fail completely, you can manually clean up:
@@ -492,10 +725,10 @@ docker stop $(docker ps -aq)
 docker rm $(docker ps -aq)
 
 # Remove networks
-docker network rm servarr-network streamarr-network
+docker network rm servarr-network streamarr-network creatarr-network
 
 # Remove generated files
-rm -f .env-servarr .env-streamarr
+rm -f .env-servarr .env-streamarr .env-creatarr
 
 # Remove empty directories (be careful!)
 find /volume1/docker -type d -empty -delete
@@ -524,13 +757,48 @@ This software is for educational and personal use only. Users are responsible fo
 
 The authors assume no responsibility for misuse of this software.
 
+## Project Growth & Future Plans 🚀
+
+This project is **actively growing** and evolving! Here's what we're working on:
+
+### **Current Status (v2.0)**
+- ✅ **3 Main Stacks**: SERVARR, STREAMARR, CREATARR
+- ✅ **28 Services**: Complete media automation ecosystem
+- ✅ **Cross-Platform Support**: Works on all major platforms
+- ✅ **Automated Setup**: One-command deployment
+- ✅ **Comprehensive Documentation**: Complete guides and troubleshooting
+
+### **Coming Soon (v2.1)**
+- 🔄 **Additional Creative Tools**: More productivity and creative applications
+- 🔄 **Enhanced Automation**: Advanced n8n workflow templates
+- 🔄 **Mobile Apps**: Companion mobile applications
+- 🔄 **Advanced Monitoring**: Enhanced health checks and alerting
+- 🔄 **Backup Solutions**: Automated backup and restore systems
+
+### **Future Plans (v3.0+)**
+- 🔮 **AI Integration**: AI-powered content recommendations and automation
+- 🔮 **IoT Integration**: Smart home device integration
+- 🔮 **Advanced Security**: Enhanced security features and monitoring
+- 🔮 **Cloud Integration**: Hybrid cloud/on-premises solutions
+- 🔮 **Community Templates**: User-contributed service configurations
+
+### **Contributing to Growth**
+We welcome contributions! The project grows through:
+- **Community Feedback**: Your suggestions and feature requests
+- **Service Requests**: New services you'd like to see added
+- **Documentation**: Help improve guides and troubleshooting
+- **Testing**: Help test on different platforms and configurations
+
+**Join the conversation**: [GitHub Discussions](https://github.com/bharry29/homelab-media-stack/discussions)
+
 ## Acknowledgments
 
 - **Created by**: [The Garage Labs](https://thegaragelabs.cc)
 - **Inspired by**: [TechHutTV Homelab](https://github.com/TechHutTV/homelab/blob/main/media/) and [TRaSH-Guides](https://trash-guides.info)
 - **Built with**: Docker, Docker Compose, and the excellent work of the *arr developers
 - **Special thanks**: To the selfhosted community for continuous innovation
+- **Growing with**: Community contributions and feedback
 
 ---
 
-*Happy Streaming!*
+*Happy Streaming & Creating!* 🎬🎵🎮

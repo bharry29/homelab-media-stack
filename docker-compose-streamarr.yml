@@ -205,6 +205,47 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
+  # ---------------------------------------------------------------------------
+  # MUSIC STREAMING SERVER
+  # ---------------------------------------------------------------------------
+  # Navidrome - Self-hosted music streaming server (Spotify alternative)
+  navidrome:
+    container_name: navidrome
+    image: deluan/navidrome:latest
+    restart: unless-stopped
+    
+    # User and group configuration for proper permissions
+    user: "${PUID}:${PGID}"
+    
+    # Network configuration
+    networks:
+      streamarr-network:
+        ipv4_address: 172.40.0.6
+    
+    # Port mapping
+    ports:
+      - "${NAVIDROME_PORT:-4533}:4533"
+    
+    # Environment configuration
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - ND_SCANSCHEDULE=1h
+      - ND_LOGLEVEL=info
+      - ND_SESSIONTIMEOUT=24h
+      - ND_BASEURL=${NAVIDROME_BASE_URL:-}
+    
+    # Persistent storage and music access
+    volumes:
+      - ${STREAMARR_CONFIG_PATH}/navidrome:/data
+      - ${DATA_PATH}/music:/music:ro
+      - /etc/localtime:/etc/localtime:ro
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
 # =============================================================================
 # INTEGRATION NOTES
 # =============================================================================
