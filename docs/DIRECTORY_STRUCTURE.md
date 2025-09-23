@@ -9,11 +9,19 @@ This guide explains the complete directory structure and data flow for the Homel
 /volume1/                               # Base path (customizable)
 ├── docker/                            # Docker configurations
 │   ├── servarr/                       # Download & management configs
-│   └── streamarr/                     # Streaming & request configs
+│   ├── streamarr/                     # Streaming & request configs
+│   └── creatarr/                      # Creative content & family life configs
 └── data/                              # Shared media & downloads
     ├── downloads/                     # Download staging area
     ├── media/                         # Organized media library
-    └── plex_transcode/                # Plex transcoding cache
+    ├── plex_transcode/                # Plex transcoding cache
+    ├── roms/                          # RetroArch game ROMs
+    ├── comics/                        # Komga comic library
+    ├── audiobooks/                    # Audiobookshelf audiobook library
+    ├── podcasts/                      # Audiobookshelf podcast library
+    ├── books/                         # Calibre-Web ebook library
+    ├── recipes/                       # Mealie recipe files
+    └── saves/                         # RetroArch save files
 ```
 
 ### Detailed Structure
@@ -60,8 +68,8 @@ This guide explains the complete directory structure and data flow for the Homel
 │   │       │   └── [user].json        # User-specific configs
 │   │       ├── icons/                 # Custom service icons
 │   │       └── data/                  # Dashboard data
-│   └── streamarr/                     # STREAMARR STACK CONFIGS
-│       ├── plex/                      # Plex Media Server config
+│   ├── streamarr/                     # STREAMARR STACK CONFIGS
+│   │   ├── plex/                      # Plex Media Server config
 │       │   ├── Library/               # Plex database & metadata
 │       │   │   ├── Application Support/
 │       │   │   │   └── Plex Media Server/
@@ -84,6 +92,46 @@ This guide explains the complete directory structure and data flow for the Homel
 │           ├── ersatztv.db            # Channel database
 │           ├── cache/                 # EPG & metadata cache
 │           └── logs/                  # Channel logs
+│   └── creatarr/                      # CREATARR STACK CONFIGS
+│       ├── n8n/                       # n8n workflow automation
+│       │   ├── config/                 # n8n configuration
+│       │   │   ├── config.json         # Main config file
+│       │   │   └── encryptionKey       # Encryption key for HTTPS
+│       │   ├── workflows/              # Saved workflows
+│       │   └── logs/                   # Workflow execution logs
+│       ├── n8n-postgres/               # n8n database
+│       │   ├── postgresql/             # PostgreSQL data
+│       │   └── logs/                   # Database logs
+│       ├── mealie/                     # Mealie recipe management
+│       │   ├── data/                   # Recipe database & files
+│       │   ├── config/                 # App configuration
+│       │   └── logs/                  # Processing logs
+│       ├── mealie-db/                  # Mealie PostgreSQL database
+│       │   ├── postgresql/             # PostgreSQL data
+│       │   └── logs/                   # Database logs
+│       ├── noisedash/                  # Noisedash ambient sounds
+│       │   ├── config/                 # App configuration
+│       │   ├── samples/                # Sound samples
+│       │   └── db/                     # Database files
+│       ├── swing-music/                # Swing Music player
+│       │   ├── config/                 # Player configuration
+│       │   └── logs/                   # Player logs
+│       ├── retroarch/                  # RetroArch gaming
+│       │   ├── config/                 # Emulator configuration
+│       │   ├── cores/                  # Emulator cores
+│       │   └── saves/                  # Save states
+│       ├── komga/                      # Komga comic library
+│       │   ├── config/                 # Library configuration
+│       │   ├── database/               # Comic database
+│       │   └── logs/                   # Library logs
+│       ├── audiobookshelf/             # Audiobookshelf library
+│       │   ├── config/                 # Library configuration
+│       │   ├── database/               # Audiobook database
+│       │   └── logs/                   # Library logs
+│       └── calibre-web/                # Calibre-Web ebook library
+│           ├── config/                 # Library configuration
+│           ├── database/               # Ebook database
+│           └── logs/                    # Library logs
 └── data/                              # SHARED DATA VOLUME
     ├── downloads/                     # Download staging area
     │   ├── complete/                  # Completed downloads (FileBot input)
@@ -135,10 +183,57 @@ This guide explains the complete directory structure and data flow for the Homel
     │       │   │   └── folder.jpg     # Album artwork
     │       │   └── Another Album (2022)/
     │       └── Another Artist/
-    └── plex_transcode/                # Plex transcoding cache
-        ├── Sessions/                  # Active transcoding sessions
-        │   └── [session-id]/          # Individual transcode sessions
-        └── Updates/                   # Plex update cache
+    ├── plex_transcode/                # Plex transcoding cache
+    │   ├── Sessions/                  # Active transcoding sessions
+    │   │   └── [session-id]/          # Individual transcode sessions
+    │   └── Updates/                   # Plex update cache
+    ├── roms/                          # RetroArch game ROMs
+    │   ├── nes/                       # NES ROMs
+    │   ├── snes/                      # SNES ROMs
+    │   ├── genesis/                   # Sega Genesis ROMs
+    │   ├── psx/                       # PlayStation ROMs
+    │   └── [other-consoles]/          # Other console ROMs
+    ├── comics/                        # Komga comic library
+    │   ├── [series]/                  # Comic series folders
+    │   │   ├── [issue]/               # Individual issues
+    │   │   │   ├── cover.jpg          # Issue cover
+    │   │   │   └── pages/              # Comic pages
+    │   │   └── series.nfo             # Series metadata
+    │   └── [other-series]/            # Other comic series
+    ├── audiobooks/                    # Audiobookshelf audiobook library
+    │   ├── [author]/                  # Author folders
+    │   │   ├── [book]/                # Book folders
+    │   │   │   ├── [chapters]/        # Audio chapters
+    │   │   │   ├── cover.jpg          # Book cover
+    │   │   │   └── metadata.nfo       # Book metadata
+    │   │   └── [other-books]/         # Other books by author
+    │   └── [other-authors]/           # Other authors
+    ├── podcasts/                      # Audiobookshelf podcast library
+    │   ├── [podcast]/                 # Podcast folders
+    │   │   ├── [episodes]/            # Podcast episodes
+    │   │   ├── cover.jpg              # Podcast cover
+    │   │   └── feed.xml               # RSS feed
+    │   └── [other-podcasts]/          # Other podcasts
+    ├── books/                         # Calibre-Web ebook library
+    │   ├── [author]/                  # Author folders
+    │   │   ├── [book]/                # Book folders
+    │   │   │   ├── book.epub          # Ebook file
+    │   │   │   ├── cover.jpg          # Book cover
+    │   │   │   └── metadata.opf       # Book metadata
+    │   │   └── [other-books]/         # Other books by author
+    │   └── [other-authors]/           # Other authors
+    ├── recipes/                       # Mealie recipe files
+    │   ├── [recipe-name]/             # Recipe folders
+    │   │   ├── recipe.json            # Recipe data
+    │   │   ├── image.jpg              # Recipe image
+    │   │   └── notes.txt              # Recipe notes
+    │   └── [other-recipes]/           # Other recipes
+    └── saves/                         # RetroArch save files
+        ├── [game-name]/               # Game save folders
+        │   ├── save.srm               # Save state
+        │   ├── savestate.sav          # Quick save
+        │   └── screenshot.png         # Game screenshot
+        └── [other-games]/             # Other game saves
 ```
 
 ## 🔄 Data Flow Process

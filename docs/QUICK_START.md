@@ -21,8 +21,8 @@ Choose the method that works for your system:
 Linux/Mac/NAS Command Line:
 bash
 # Create all required directories
-mkdir -p /volume1/docker/{servarr,streamarr}
-mkdir -p /volume1/data/{downloads/{complete,incomplete},media/{movies,tv,music},plex_transcode}
+mkdir -p /volume1/docker/{servarr,streamarr,creatarr}
+mkdir -p /volume1/data/{downloads/{complete,incomplete},media/{movies,tv,music},plex_transcode,roms,comics,audiobooks,podcasts,books,recipes,saves}
 
 # Set proper permissions (find your IDs with: id)
 chown -R 1001:1000 /volume1/docker /volume1/data
@@ -33,21 +33,37 @@ File Manager → Create shared folder: data
 Inside docker folder, create:
 servarr folder
 streamarr folder
+creatarr folder
 Inside data folder, create:
 downloads folder (with complete and incomplete subfolders)
 media folder (with movies, tv, music subfolders)
 plex_transcode folder
+roms folder (for RetroArch games)
+comics folder (for Komga)
+audiobooks folder (for Audiobookshelf)
+podcasts folder (for Audiobookshelf)
+books folder (for Calibre-Web)
+recipes folder (for Mealie)
+saves folder (for RetroArch save files)
 Windows:
 powershell
 # Create directory structure
 New-Item -ItemType Directory -Path "C:\homelab-media-stack\docker\servarr" -Force
 New-Item -ItemType Directory -Path "C:\homelab-media-stack\docker\streamarr" -Force
+New-Item -ItemType Directory -Path "C:\homelab-media-stack\docker\creatarr" -Force
 New-Item -ItemType Directory -Path "C:\homelab-media-stack\data\downloads\complete" -Force
 New-Item -ItemType Directory -Path "C:\homelab-media-stack\data\downloads\incomplete" -Force
 New-Item -ItemType Directory -Path "C:\homelab-media-stack\data\media\movies" -Force
 New-Item -ItemType Directory -Path "C:\homelab-media-stack\data\media\tv" -Force
 New-Item -ItemType Directory -Path "C:\homelab-media-stack\data\media\music" -Force
 New-Item -ItemType Directory -Path "C:\homelab-media-stack\data\plex_transcode" -Force
+New-Item -ItemType Directory -Path "C:\homelab-media-stack\data\roms" -Force
+New-Item -ItemType Directory -Path "C:\homelab-media-stack\data\comics" -Force
+New-Item -ItemType Directory -Path "C:\homelab-media-stack\data\audiobooks" -Force
+New-Item -ItemType Directory -Path "C:\homelab-media-stack\data\podcasts" -Force
+New-Item -ItemType Directory -Path "C:\homelab-media-stack\data\books" -Force
+New-Item -ItemType Directory -Path "C:\homelab-media-stack\data\recipes" -Force
+New-Item -ItemType Directory -Path "C:\homelab-media-stack\data\saves" -Force
 Step 3: Deploy the Stacks
 bash
 # Docker Compose will automatically create the required networks
@@ -56,11 +72,15 @@ docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
 
 # Wait for VPN connection (2-3 minutes), then start streaming stack
 docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
+
+# Start creative content & family life stack
+docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml up -d
 Step 4: Configure Environment Files
 Copy Example Files:
 bash
 cp .env-servarr.example .env-servarr
 cp .env-streamarr.example .env-streamarr
+cp .env-creatarr.example .env-creatarr
 Configure SERVARR Stack (Downloads):
 bash
 # Edit the servarr environment file
@@ -105,6 +125,31 @@ PLEX_NO_AUTH_NETWORKS=192.168.1.0/24,172.40.0.0/24  # Your local network
 # Directory Paths
 STREAMARR_CONFIG_PATH=/volume1/docker/streamarr
 DATA_PATH=/volume1/data
+Configure CREATARR Stack (Creative Content & Family Life):
+bash
+# Edit the creatarr environment file
+nano .env-creatarr  # Linux/Mac
+notepad .env-creatarr  # Windows
+Essential Settings to Change:
+
+bash
+# System Configuration (same as other stacks)
+PUID=1001
+PGID=1000
+TZ=America/Los_Angeles
+
+# n8n Workflow Automation
+N8N_USER=admin
+N8N_PASSWORD=your_secure_password_here
+N8N_ENCRYPTION_KEY=your_encryption_key_here  # For HTTPS/domain access
+
+# Mealie Recipe Management
+MEALIE_ALLOW_SIGNUP=true
+MEALIE_BASE_URL=http://your-nas-ip:9001
+
+# Directory Paths
+CREATARR_CONFIG_PATH=/volume1/docker/creatarr
+DATA_PATH=/volume1/data
 Platform-Specific Path Adjustments:
 
 Platform	Base Path	PUID:PGID
@@ -141,6 +186,10 @@ Replace your-server-ip with your actual server IP address:
 Overseerr: http://your-server-ip:5055
 Sonarr: http://your-server-ip:8989
 Radarr: http://your-server-ip:7878
+🤖 n8n Workflows: http://your-server-ip:5678
+🍽️ Mealie Recipes: http://your-server-ip:9001
+🎵 Noisedash: http://your-server-ip:3002
+🎮 RetroArch Gaming: http://your-server-ip:8081
 2. Configure qBittorrent (5 minutes)
 1. Go to http://your-server-ip:8080
 2. Login: admin / adminadmin
@@ -247,6 +296,13 @@ Main Services:
 🎬 Plex Media Server: http://your-server-ip:32400/web (watch your content)
 Overseerr: http://your-server-ip:5055 (request new content)
 Tautulli: http://your-server-ip:8181 (viewing statistics)
+🤖 n8n Workflows: http://your-server-ip:5678 (workflow automation)
+🍽️ Mealie Recipes: http://your-server-ip:9001 (recipe management)
+🎵 Noisedash: http://your-server-ip:3002 (ambient sounds)
+🎮 RetroArch Gaming: http://your-server-ip:8081 (retro gaming)
+📚 Komga Comics: http://your-server-ip:25600 (comic library)
+🎧 Audiobookshelf: http://your-server-ip:13378 (audiobook library)
+📖 Calibre-Web: http://your-server-ip:8083 (ebook library)
 Family Usage:
 Family requests content via Overseerr on their phones
 System automatically downloads and organizes everything
@@ -272,7 +328,7 @@ Open a GitHub Issue for bugs
 Join GitHub Discussions for questions
 Total Setup Time: ~30 minutes for basic functionality
 
-Result: Complete automated media server with VPN-protected downloads, request management, and streaming ready for your family to enjoy!
+Result: Complete automated media server with VPN-protected downloads, request management, streaming, workflow automation, recipe management, gaming, and digital libraries - ready for your family to enjoy!
 
 Happy streaming! 🎬
 

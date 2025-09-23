@@ -12,9 +12,10 @@ docker ps -a
 # Check specific stack
 docker-compose --env-file .env-servarr -f docker-compose-servarr.yml ps
 docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml ps
+docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml ps
 
 # Check Docker networks
-docker network ls | grep -E "(servarr|streamarr)"
+docker network ls | grep -E "(servarr|streamarr|creatarr)"
 ```
 
 ### Check Logs
@@ -184,11 +185,12 @@ sudo chown -R 1001:1000 /volume1/data/downloads/
 #### Problem: Docker network conflicts during setup
 ```bash
 # Check for existing networks
-docker network ls | grep -E "(servarr|streamarr)"
+docker network ls | grep -E "(servarr|streamarr|creatarr)"
 
 # Check if networks are in use
 docker network inspect servarr-network
 docker network inspect streamarr-network
+docker network inspect creatarr-network
 ```
 
 **Solutions:**
@@ -196,10 +198,12 @@ docker network inspect streamarr-network
 # 1. Remove conflicting networks (if no containers are attached)
 docker network rm servarr-network
 docker network rm streamarr-network
+docker network rm creatarr-network
 
 # 2. Let Docker Compose recreate networks
 docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
 docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
+docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml up -d
 
 # 3. Use the setup script which handles conflicts automatically
 ./scripts/setup.sh
@@ -212,7 +216,7 @@ docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
 #### Problem: Can't access web interfaces
 ```bash
 # Check if containers are running
-docker ps | grep -E "(sonarr|radarr|plex|overseerr)"
+docker ps | grep -E "(sonarr|radarr|plex|overseerr|n8n|mealie|noisedash|retroarch)"
 
 # Check port bindings
 docker port sonarr
@@ -229,18 +233,25 @@ sudo ufw allow 8989  # Sonarr
 sudo ufw allow 7878  # Radarr
 sudo ufw allow 32400 # Plex
 sudo ufw allow 5055  # Overseerr
+sudo ufw allow 5678  # n8n
+sudo ufw allow 9001  # Mealie
+sudo ufw allow 3002  # Noisedash
+sudo ufw allow 8081  # RetroArch
 
 # 2. Check if ports are in use
-netstat -tulpn | grep -E "(8989|7878|32400|5055)"
+netstat -tulpn | grep -E "(8989|7878|32400|5055|5678|9001|3002|8081)"
 
 # 3. Test local connectivity
 curl -I http://localhost:8989
 curl -I http://localhost:32400
+curl -I http://localhost:5678
+curl -I http://localhost:9001
 
 # 4. Check Docker networks
 docker network ls
 docker network inspect servarr-network
 docker network inspect streamarr-network
+docker network inspect creatarr-network
 
 # 5. Find your server IP
 hostname -I | awk '{print $1}'
@@ -502,7 +513,113 @@ docker exec filebot-watcher cat /data/amc-exclude-list.txt
 # FileBot needs proper file naming to detect content type
 ```
 
-### 7. Service Integration Issues
+### 7. CREATARR Stack Issues
+
+#### Problem: n8n "Bad Gateway" error
+```bash
+# Check n8n logs
+docker logs n8n
+
+# Common issues:
+# - "Database connection failed"
+# - "Encryption key not set"
+# - "Port already in use"
+```
+
+**Solutions:**
+```bash
+# 1. Check n8n database connection
+docker logs n8n-postgres
+# Should show: "database system is ready to accept connections"
+
+# 2. Verify encryption key is set
+grep N8N_ENCRYPTION_KEY .env-creatarr
+# Should show: N8N_ENCRYPTION_KEY=your_key_here
+
+# 3. Check port conflicts
+netstat -tulpn | grep 5678
+# If port is in use, change N8N_PORT in .env-creatarr
+
+# 4. Restart n8n services
+docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml restart n8n n8n-postgres
+
+# 5. Check n8n container IP
+docker inspect n8n | grep IPAddress
+# Should be: 172.41.0.11
+```
+
+#### Problem: Mealie database not found
+```bash
+# Check Mealie logs
+docker logs mealie
+# Common error: "database 'mealie' does not exist"
+```
+
+**Solutions:**
+```bash
+# 1. Check mealie-db container
+docker logs mealie-db
+# Should show: "database system is ready"
+
+# 2. Verify database credentials
+grep MEALIE_DB .env-creatarr
+# Should match between mealie and mealie-db services
+
+# 3. Restart database first, then Mealie
+docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml restart mealie-db
+sleep 30
+docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml restart mealie
+
+# 4. Check database permissions
+docker exec mealie-db psql -U mealieuser -d mealie -c "\l"
+```
+
+#### Problem: Port conflicts with CREATARR services
+```bash
+# Check for port conflicts
+netstat -tulpn | grep -E "(5678|9001|3002|8081|25600|13378|8083)"
+```
+
+**Solutions:**
+```bash
+# 1. Check which services are using ports
+docker ps --format "table {{.Names}}\t{{.Ports}}"
+
+# 2. Update port mappings in .env-creatarr
+# Common conflicts:
+# - Port 9000: Portainer vs Mealie → Mealie moved to 9001
+# - Port 3000: Uptime Kuma vs Noisedash → Noisedash moved to 3002
+# - Port 8080: qBittorrent vs RetroArch → RetroArch moved to 8081
+
+# 3. Restart affected services
+docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml restart
+```
+
+#### Problem: Database permission issues
+```bash
+# Check for permission errors
+docker logs mealie-db | grep -i permission
+docker logs n8n-postgres | grep -i permission
+```
+
+**Solutions:**
+```bash
+# 1. Fix database directory permissions
+sudo chown -R 999:999 /volume1/docker/creatarr/mealie-db/
+sudo chown -R 999:999 /volume1/docker/creatarr/n8n-postgres/
+sudo chmod -R 700 /volume1/docker/creatarr/mealie-db/
+sudo chmod -R 700 /volume1/docker/creatarr/n8n-postgres/
+
+# 2. Restart database services
+docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml restart mealie-db n8n-postgres
+
+# 3. Check container user IDs
+docker exec mealie-db id
+docker exec n8n-postgres id
+# Should show: uid=999(postgres) gid=999(postgres)
+```
+
+### 8. Service Integration Issues
 
 #### Problem: Overseerr can't connect to Sonarr/Radarr
 ```bash
@@ -566,6 +683,7 @@ docker exec prowlarr curl -I http://your-server-ip:8989
 # 1. Stop all services
 docker-compose --env-file .env-servarr -f docker-compose-servarr.yml down
 docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml down
+docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml down
 
 # 2. Remove containers (optional - keeps data)
 docker system prune -f
@@ -574,6 +692,7 @@ docker system prune -f
 docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
 # Wait for VPN connection
 docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
+docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml up -d
 ```
 
 ### Database Corruption Recovery
@@ -595,11 +714,12 @@ sqlite3 /volume1/docker/servarr/sonarr/sonarr.db "PRAGMA integrity_check;"
 ### Network Issues Recovery
 ```bash
 # 1. Remove and recreate Docker networks
-docker network rm servarr-network streamarr-network
+docker network rm servarr-network streamarr-network creatarr-network
 
 # 2. Let Docker Compose recreate networks automatically
 docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
 docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
+docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml up -d
 
 # Note: Docker Compose will automatically create the networks with proper configuration
 # No manual network creation is needed
