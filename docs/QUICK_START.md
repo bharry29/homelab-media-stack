@@ -21,7 +21,7 @@ Choose the method that works for your system:
 Linux/Mac/NAS Command Line:
 bash
 # Create all required directories
-mkdir -p /volume1/docker/{servarr,streamarr,creatarr}
+mkdir -p /volume1/docker/{servarr,streamarr,creatarr,business,infrastructure}
 mkdir -p /volume1/data/{downloads/{complete,incomplete},media/{movies,tv,music},plex_transcode,roms,comics,audiobooks,podcasts,books,recipes,saves}
 
 # Set proper permissions (find your IDs with: id)
@@ -34,6 +34,8 @@ Inside docker folder, create:
 servarr folder
 streamarr folder
 creatarr folder
+business folder
+infrastructure folder
 Inside data folder, create:
 downloads folder (with complete and incomplete subfolders)
 media folder (with movies, tv, music subfolders)
@@ -73,14 +75,22 @@ docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
 # Wait for VPN connection (2-3 minutes), then start streaming stack
 docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
 
-# Start creative content & family life stack
+# Start creative content stack
 docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml up -d
+
+# Start infrastructure stack (mandatory - includes Homarr, Uptime Kuma, Watchtower)
+docker-compose --env-file .env-infrastructure -f docker-compose-infrastructure.yml up -d
+
+# Start business stack (optional)
+docker-compose --env-file .env-business -f docker-compose-business.yml up -d
 Step 4: Configure Environment Files
 Copy Example Files:
 bash
 cp .env-servarr.example .env-servarr
 cp .env-streamarr.example .env-streamarr
 cp .env-creatarr.example .env-creatarr
+cp .env-infrastructure.example .env-infrastructure
+cp .env-business.example .env-business
 Configure SERVARR Stack (Downloads):
 bash
 # Edit the servarr environment file
@@ -125,11 +135,36 @@ PLEX_NO_AUTH_NETWORKS=192.168.1.0/24,172.40.0.0/24  # Your local network
 # Directory Paths
 STREAMARR_CONFIG_PATH=/volume1/docker/streamarr
 DATA_PATH=/volume1/data
-Configure CREATARR Stack (Creative Content & Family Life):
+
+Configure INFRASTRUCTURE Stack (System Management - Mandatory):
 bash
-# Edit the creatarr environment file
-nano .env-creatarr  # Linux/Mac
-notepad .env-creatarr  # Windows
+# Edit the infrastructure environment file
+nano .env-infrastructure  # Linux/Mac
+notepad .env-infrastructure  # Windows
+Essential Settings to Change:
+
+bash
+# System Configuration (same as other stacks)
+PUID=1001
+PGID=1000
+TZ=America/Los_Angeles
+
+# Directory Paths
+INFRASTRUCTURE_CONFIG_PATH=/volume1/docker/infrastructure
+
+# Service Ports
+HOMARR_PORT=7575           # Service dashboard
+UPTIME_KUMA_PORT=3001      # System monitoring
+
+# Watchtower Configuration (monitors all labeled containers)
+WATCHTOWER_SCHEDULE=0 6 * * *  # Daily at 6 AM
+WATCHTOWER_LABEL_ENABLE=true   # Only update labeled containers
+
+Configure BUSINESS Stack (Business & Productivity):
+bash
+# Edit the business environment file
+nano .env-business  # Linux/Mac
+notepad .env-business  # Windows
 Essential Settings to Change:
 
 bash
@@ -146,6 +181,23 @@ N8N_ENCRYPTION_KEY=your_encryption_key_here  # For HTTPS/domain access
 # Mealie Recipe Management
 MEALIE_ALLOW_SIGNUP=true
 MEALIE_BASE_URL=http://your-nas-ip:9001
+
+# Directory Paths
+BUSINESS_CONFIG_PATH=/volume1/docker/business
+DATA_PATH=/volume1/data
+
+Configure CREATARR Stack (Creative Content & Entertainment):
+bash
+# Edit the creatarr environment file
+nano .env-creatarr  # Linux/Mac
+notepad .env-creatarr  # Windows
+Essential Settings to Change:
+
+bash
+# System Configuration (same as other stacks)
+PUID=1001
+PGID=1000
+TZ=America/Los_Angeles
 
 # Directory Paths
 CREATARR_CONFIG_PATH=/volume1/docker/creatarr

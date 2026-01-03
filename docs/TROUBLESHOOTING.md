@@ -13,9 +13,11 @@ docker ps -a
 docker-compose --env-file .env-servarr -f docker-compose-servarr.yml ps
 docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml ps
 docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml ps
+docker-compose --env-file .env-business -f docker-compose-business.yml ps
+docker-compose --env-file .env-infrastructure -f docker-compose-infrastructure.yml ps
 
 # Check Docker networks
-docker network ls | grep -E "(servarr|streamarr|creatarr)"
+docker network ls | grep -E "(servarr|streamarr|creatarr|business|infrastructure|websites)"
 ```
 
 ### Check Logs
@@ -815,7 +817,7 @@ echo "REMEMBER: Remove sensitive data before sharing!"
 
 1. **Regular Backups**: Backup configurations weekly
 2. **Monitor Disk Space**: Set alerts for low disk space (< 10GB free)
-3. **Update Regularly**: Use Watchtower or manual updates monthly
+3. **Update Regularly**: Infrastructure stack Watchtower handles automatic updates for all labeled containers
 4. **Monitor Logs**: Check logs weekly for early warning signs
 5. **Test Connectivity**: Periodically test VPN and service connectivity
 6. **Document Changes**: Keep notes of configuration changes

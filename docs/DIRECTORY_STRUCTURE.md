@@ -10,7 +10,9 @@ This guide explains the complete directory structure and data flow for the Homel
 ├── docker/                            # Docker configurations
 │   ├── servarr/                       # Download & management configs
 │   ├── streamarr/                     # Streaming & request configs
-│   └── creatarr/                      # Creative content & family life configs
+│   ├── creatarr/                      # Creative content & entertainment configs
+│   ├── business/                      # Business & productivity configs
+│   └── infrastructure/               # System management configs
 └── data/                              # Shared media & downloads
     ├── downloads/                     # Download staging area
     ├── media/                         # Organized media library
@@ -62,12 +64,15 @@ This guide explains the complete directory structure and data flow for the Homel
 │   │   │   ├── bazarr.db              # Subtitle database
 │   │   │   ├── config/                # Configuration files
 │   │   │   └── logs/                  # Subtitle logs
-│   │   └── homarr/                    # Dashboard configuration
-│   │       ├── configs/               # Dashboard settings
-│   │       │   ├── default.json       # Default dashboard config
-│   │       │   └── [user].json        # User-specific configs
-│   │       ├── icons/                 # Custom service icons
-│   │       └── data/                  # Dashboard data
+│   ├── infrastructure/                # INFRASTRUCTURE STACK CONFIGS
+│   │   ├── homarr/                    # Dashboard configuration
+│   │   │   ├── configs/               # Dashboard settings
+│   │   │   │   ├── default.json       # Default dashboard config
+│   │   │   │   └── [user].json        # User-specific configs
+│   │   │   ├── icons/                 # Custom service icons
+│   │   │   └── data/                  # Dashboard data
+│   │   └── uptime-kuma/               # System monitoring
+│   │       └── data/                  # Monitoring database
 │   ├── streamarr/                     # STREAMARR STACK CONFIGS
 │   │   ├── plex/                      # Plex Media Server config
 │       │   ├── Library/               # Plex database & metadata
@@ -92,40 +97,43 @@ This guide explains the complete directory structure and data flow for the Homel
 │           ├── ersatztv.db            # Channel database
 │           ├── cache/                 # EPG & metadata cache
 │           └── logs/                  # Channel logs
+│   ├── business/                      # BUSINESS STACK CONFIGS
+│   │   ├── n8n/                       # n8n workflow automation
+│   │   │   ├── config/                 # n8n configuration
+│   │   │   │   ├── config.json         # Main config file
+│   │   │   │   └── encryptionKey       # Encryption key for HTTPS
+│   │   │   ├── workflows/              # Saved workflows
+│   │   │   └── logs/                   # Workflow execution logs
+│   │   ├── n8n-postgres/               # n8n database
+│   │   │   ├── postgresql/             # PostgreSQL data
+│   │   │   └── logs/                   # Database logs
+│   │   ├── mealie/                     # Mealie recipe management
+│   │   │   ├── data/                   # Recipe database & files
+│   │   │   └── logs/                   # Recipe logs
+│   │   └── mealie-db/                  # Mealie database
+│   │       └── postgresql/             # PostgreSQL data
 │   └── creatarr/                      # CREATARR STACK CONFIGS
-│       ├── n8n/                       # n8n workflow automation
-│       │   ├── config/                 # n8n configuration
-│       │   │   ├── config.json         # Main config file
-│       │   │   └── encryptionKey       # Encryption key for HTTPS
-│       │   ├── workflows/              # Saved workflows
-│       │   └── logs/                   # Workflow execution logs
-│       ├── n8n-postgres/               # n8n database
-│       │   ├── postgresql/             # PostgreSQL data
-│       │   └── logs/                   # Database logs
-│       ├── mealie/                     # Mealie recipe management
-│       │   ├── data/                   # Recipe database & files
-│       │   ├── config/                 # App configuration
-│       │   └── logs/                  # Processing logs
-│       ├── mealie-db/                  # Mealie PostgreSQL database
-│       │   ├── postgresql/             # PostgreSQL data
-│       │   └── logs/                   # Database logs
-│       ├── noisedash/                  # Noisedash ambient sounds
-│       │   ├── config/                 # App configuration
-│       │   ├── samples/                # Sound samples
-│       │   └── db/                     # Database files
-│       ├── swing-music/                # Swing Music player
-│       │   ├── config/                 # Player configuration
-│       │   └── logs/                   # Player logs
-│       ├── retroarch/                  # RetroArch gaming
+│       ├── retroarch/                  # RetroArch gaming emulator
 │       │   ├── config/                 # Emulator configuration
-│       │   ├── cores/                  # Emulator cores
-│       │   └── saves/                  # Save states
-│       ├── komga/                      # Komga comic library
-│       │   ├── config/                 # Library configuration
+│       │   ├── saves/                  # Game save files
+│       │   └── states/                  # Game state files
+│       ├── komga/                      # Komga comic server
+│       │   ├── config/                 # Server configuration
 │       │   ├── database/               # Comic database
-│       │   └── logs/                   # Library logs
-│       ├── audiobookshelf/             # Audiobookshelf library
-│       │   ├── config/                 # Library configuration
+│       │   └── logs/                    # Server logs
+│       ├── audiobookshelf/             # Audiobookshelf server
+│       │   ├── config/                 # Server configuration
+│       │   ├── metadata/               # Metadata database
+│       │   └── logs/                    # Server logs
+│       ├── calibre-web/                # Calibre-Web e-book server
+│       │   ├── config/                 # Server configuration
+│       │   ├── database/               # E-book database
+│       │   └── logs/                    # Server logs
+│       ├── noisedash/                  # Noisedash ambient sounds
+│       │   └── data/                    # Sound library
+│       └── swing-music/                # Swing Music player
+│           ├── config/                 # Player configuration
+│           └── data/                    # Music library
 │       │   ├── database/               # Audiobook database
 │       │   └── logs/                   # Library logs
 │       └── calibre-web/                # Calibre-Web ebook library

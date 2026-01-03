@@ -76,10 +76,10 @@ extract_existing_key() {
     # Common n8n config locations
     local config_locations=(
         "${HOME}/.n8n/config"
-        "/volume1/docker/creatarr/n8n/config"
-        "/opt/homelab/docker/creatarr/n8n/config"
-        "/mnt/user/docker/creatarr/n8n/config"
-        "./docker/creatarr/n8n/config"
+        "/volume1/docker/business/n8n/config"
+        "/opt/homelab/docker/business/n8n/config"
+        "/mnt/user/docker/business/n8n/config"
+        "./docker/business/n8n/config"
     )
     
     local config_file=""
@@ -126,22 +126,22 @@ extract_existing_key() {
 }
 
 #################################################################################################################################################
-# Update .env-creatarr with encryption key
+# Update .env-business with encryption key
 #################################################################################################################################################
 update_env_file() {
     local key="$1"
     
-    if [[ -f ".env-creatarr" ]]; then
-        if sed -i.bak "s|N8N_ENCRYPTION_KEY=.*|N8N_ENCRYPTION_KEY=${key}|g" ".env-creatarr"; then
-            printf '\n%b\n' " ${utick} Updated .env-creatarr with encryption key"
-            rm -f ".env-creatarr.bak" 2>/dev/null || true
+    if [[ -f ".env-business" ]]; then
+        if sed -i.bak "s|N8N_ENCRYPTION_KEY=.*|N8N_ENCRYPTION_KEY=${key}|g" ".env-business"; then
+            printf '\n%b\n' " ${utick} Updated .env-business with encryption key"
+            rm -f ".env-business.bak" 2>/dev/null || true
             return 0
         else
-            printf '\n%b\n' " ${ucross} Failed to update .env-creatarr"
+            printf '\n%b\n' " ${ucross} Failed to update .env-business"
             return 1
         fi
     else
-        printf '\n%b\n' " ${ucross} .env-creatarr file not found"
+        printf '\n%b\n' " ${ucross} .env-business file not found"
         printf '\n%b\n' " ${uyc} Please run the setup script first or create the file manually"
         return 1
     fi
@@ -158,7 +158,7 @@ main_menu() {
     printf '\n%b\n' " ${clc}2)${cend} Extract key from existing n8n config"
     printf '\n%b\n' " ${clc}3)${cend} Use existing key file (n8n-encryption-key.txt)"
     printf '\n%b\n' " ${clc}4)${cend} Manual key entry"
-    printf '\n%b\n' " ${clc}5)${cend} Show current key from .env-creatarr"
+    printf '\n%b\n' " ${clc}5)${cend} Show current key from .env-business"
     printf '\n%b\n' " ${clc}6)${cend} Exit"
     
     printf '\n'
@@ -171,7 +171,7 @@ main_menu() {
                 if generate_new_key; then
                     local key=$(cat n8n-encryption-key.txt 2>/dev/null)
                     if [[ -n "$key" ]]; then
-                        printf '\n%b\n' " ${uyc} Update .env-creatarr with this key? [Y/n]: "
+                        printf '\n%b\n' " ${uyc} Update .env-business with this key? [Y/n]: "
                         read -r update_confirm
                         if [[ ! "$update_confirm" =~ ^[Nn]$ ]]; then
                             update_env_file "$key"
@@ -184,7 +184,7 @@ main_menu() {
                 if extract_existing_key; then
                     local key=$(cat n8n-encryption-key.txt 2>/dev/null)
                     if [[ -n "$key" ]]; then
-                        printf '\n%b\n' " ${uyc} Update .env-creatarr with this key? [Y/n]: "
+                        printf '\n%b\n' " ${uyc} Update .env-business with this key? [Y/n]: "
                         read -r update_confirm
                         if [[ ! "$update_confirm" =~ ^[Nn]$ ]]; then
                             update_env_file "$key"
@@ -198,7 +198,7 @@ main_menu() {
                     local key=$(cat n8n-encryption-key.txt)
                     printf '\n%b\n' " ${utick} Found key file:"
                     printf '\n%b\n' " ${clc}${key}${cend}"
-                    printf '\n%b\n' " ${uyc} Update .env-creatarr with this key? [Y/n]: "
+                    printf '\n%b\n' " ${uyc} Update .env-business with this key? [Y/n]: "
                     read -r update_confirm
                     if [[ ! "$update_confirm" =~ ^[Nn]$ ]]; then
                         update_env_file "$key"
@@ -214,7 +214,7 @@ main_menu() {
                 read -r manual_key
                 if [[ -n "$manual_key" ]]; then
                     printf '\n%b\n' " ${utick} Using provided key: ${clc}${manual_key}${cend}"
-                    printf '\n%b\n' " ${uyc} Update .env-creatarr with this key? [Y/n]: "
+                    printf '\n%b\n' " ${uyc} Update .env-business with this key? [Y/n]: "
                     read -r update_confirm
                     if [[ ! "$update_confirm" =~ ^[Nn]$ ]]; then
                         update_env_file "$manual_key"
@@ -225,16 +225,16 @@ main_menu() {
                 break
                 ;;
             5)
-                if [[ -f ".env-creatarr" ]]; then
-                    local current_key=$(grep "N8N_ENCRYPTION_KEY=" ".env-creatarr" | cut -d'=' -f2)
+                if [[ -f ".env-business" ]]; then
+                    local current_key=$(grep "N8N_ENCRYPTION_KEY=" ".env-business" | cut -d'=' -f2)
                     if [[ -n "$current_key" ]]; then
-                        printf '\n%b\n' " ${utick} Current key in .env-creatarr:"
+                        printf '\n%b\n' " ${utick} Current key in .env-business:"
                         printf '\n%b\n' " ${clc}${current_key}${cend}"
                     else
-                        printf '\n%b\n' " ${uyc} No encryption key set in .env-creatarr"
+                        printf '\n%b\n' " ${uyc} No encryption key set in .env-business"
                     fi
                 else
-                    printf '\n%b\n' " ${ucross} .env-creatarr file not found"
+                    printf '\n%b\n' " ${ucross} .env-business file not found"
                 fi
                 break
                 ;;

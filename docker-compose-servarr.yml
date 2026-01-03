@@ -1,5 +1,5 @@
 # =============================================================================
-# SERVARR STACK - Download & Management Services  
+# SERVARR STACK - Media Management & Download Services  
 # =============================================================================
 # 
 # This stack handles all download and media management operations:
@@ -8,15 +8,16 @@
 # • Indexer management (Prowlarr)
 # • Media automation (*arr suite: Sonarr, Radarr, Lidarr, Bazarr)
 # • File processing and organization (FileBot)
-# • Service dashboard (Homarr)
 # • Automatic updates (Watchtower)
 #
-# Network: 172.39.0.0/24 (isolated from streamarr stack)
-# Data: Shared /data volume with streamarr stack
+# Network: 172.39.0.0/24 (isolated from other stacks)
+# Data: Shared /data volume with other stacks
 # Environment: Configure via .env-servarr file
 #
 # Deploy: docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
 # =============================================================================
+
+version: '3.8'
 
 # =============================================================================
 # NETWORKS
@@ -28,6 +29,7 @@ networks:
     ipam:
       config:
         - subnet: 172.39.0.0/24
+          gateway: 172.39.0.1
 
 # =============================================================================
 # VOLUMES
@@ -52,9 +54,6 @@ services:
     container_name: gluetun
     hostname: gluetun
     restart: unless-stopped
-    
-    # User and group configuration for proper permissions
-    user: "${PUID}:${PGID}"
     
     # Network configuration
     networks:
@@ -445,8 +444,7 @@ services:
       --action move
       --conflict auto
       -non-strict
-      --log-file /data/amc.log
-      --def excludeList=/data/amc-exclude-list.txt
+      --def excludeList=/media_data_path/amc-exclude-list.txt
       --def unsorted=y music=y artwork=y clean=y movieDB=TheMovieDB seriesDB=TheMovieDB::TV animeDB=TheMovieDB::TV musicDB=ID3 movieFormat="/media_data_path/{hd ==~ /UHD|QHD/ ? "UHD" : hd ==~ /FHD|HD/ ? "HD" : "SD"}/{info.OriginalLanguage}/{~plex}" animeFormat="/media_data_path/Anime/{info.OriginalLanguage}/{~plex}" seriesFormat="/media_data_path/TV Shows/{info.OriginalLanguage}/{~plex}" unsortedFormat="/media_data_path/Unsorted/" "ut_label=%L" "ut_title=%N" "ut_kind=multi" "ut_dir=%F"
       --def plex=${PLEX_TOKEN}
       --def discord=${DISCORD_WEBHOOK}
@@ -455,108 +453,11 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
-  # ---------------------------------------------------------------------------
-  # SERVICE DASHBOARD
-  # ---------------------------------------------------------------------------
-  # Unified dashboard for managing all servarr services
-  homarr:
-    image: ghcr.io/ajnart/homarr:latest
-    container_name: homarr
-    hostname: homarr
-    restart: unless-stopped
-    
-    # Direct network access
-    networks:
-      servarr-network:
-        ipv4_address: 172.39.0.9
-    
-    # External access to dashboard
-    ports:
-      - "${HOMARR_PORT:-7575}:7575"
-    
-    # User and system configuration
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-    
-    # Persistent storage and Docker integration
-    volumes:
-      - ${SERVARR_CONFIG_PATH}/homarr/configs:/app/data/configs
-      - ${SERVARR_CONFIG_PATH}/homarr/icons:/app/public/icons
-      - ${SERVARR_CONFIG_PATH}/homarr/data:/data
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    
-    # Update management
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
-
-  # ---------------------------------------------------------------------------
-  # AUTOMATIC UPDATES
-  # ---------------------------------------------------------------------------
-  # Automatic container updates with cleanup and notifications
-  watchtower:
-    image: containrrr/watchtower:latest
-    container_name: watchtower
-    hostname: watchtower
-    restart: unless-stopped
-    
-    # Internal network (no external access needed)
-    networks:
-      servarr-network:
-        ipv4_address: 172.39.0.10
-    
-    # System configuration
-    environment:
-      - TZ=${TZ}
-      - WATCHTOWER_CLEANUP=${WATCHTOWER_CLEANUP:-true}
-      - WATCHTOWER_REMOVE_VOLUMES=${WATCHTOWER_REMOVE_VOLUMES:-false}
-      - WATCHTOWER_INCLUDE_STOPPED=${WATCHTOWER_INCLUDE_STOPPED:-true}
-      - WATCHTOWER_SCHEDULE=${WATCHTOWER_SCHEDULE:-0 6 * * *}
-      - WATCHTOWER_LABEL_ENABLE=${WATCHTOWER_LABEL_ENABLE:-true}
-      - WATCHTOWER_NOTIFICATIONS=${WATCHTOWER_NOTIFICATIONS:-}
-      - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL:-}
-      - WATCHTOWER_DEBUG=${WATCHTOWER_DEBUG:-false}
-    
-    # Docker socket access for container management
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-
+  # Note: Automatic updates handled by watchtower-infrastructure in INFRASTRUCTURE stack
+  # All services have watchtower labels (com.centurylinklabs.watchtower.enable=true)
+  # watchtower-infrastructure monitors and updates all labeled containers
+  # Note: Homarr and Uptime Kuma moved to INFRASTRUCTURE stack
   # Note: Portainer is managed separately via setup.sh
-
-  # ---------------------------------------------------------------------------
-  # SYSTEM MONITORING
-  # ---------------------------------------------------------------------------
-  # Uptime Kuma - System monitoring and uptime tracking
-  uptime-kuma:
-    image: louislam/uptime-kuma:latest
-    container_name: uptime-kuma
-    hostname: uptime-kuma
-    restart: unless-stopped
-    
-    # Direct network access
-    networks:
-      servarr-network:
-        ipv4_address: 172.39.0.12
-    
-    # External access to web interface
-    ports:
-      - "${UPTIME_KUMA_PORT:-3001}:3001"
-    
-    # User and system configuration
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-    
-    # Persistent storage
-    volumes:
-      - ${SERVARR_CONFIG_PATH}/uptime-kuma:/app/data
-      - /etc/localtime:/etc/localtime:ro
-    
-    # Update management
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
 
 # =============================================================================
 # END OF SERVARR STACK CONFIGURATION

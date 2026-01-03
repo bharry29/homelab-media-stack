@@ -277,11 +277,50 @@ stop_and_remove_containers() {
         fi
     fi
     
+    # Stop and remove creatarr stack
+    if [[ -f "docker-compose-creatarr.yml" ]] && [[ -f ".env-creatarr" ]]; then
+        printf '\n%b\n' " ${uyc} Stopping CREATARR stack..."
+        show_loading_message "Shutting down creative services" 2
+        
+        if $compose_cmd --env-file .env-creatarr -f docker-compose-creatarr.yml down --remove-orphans 2>/dev/null; then
+            printf '\n%b\n' " ${utick} CREATARR stack stopped and removed"
+        else
+            printf '\n%b\n' " ${uyc} CREATARR stack was not running or already removed"
+        fi
+    fi
+    
+    # Stop and remove business stack
+    if [[ -f "docker-compose-business.yml" ]] && [[ -f ".env-business" ]]; then
+        printf '\n%b\n' " ${uyc} Stopping BUSINESS stack..."
+        show_loading_message "Shutting down business services" 2
+        
+        if $compose_cmd --env-file .env-business -f docker-compose-business.yml down --remove-orphans 2>/dev/null; then
+            printf '\n%b\n' " ${utick} BUSINESS stack stopped and removed"
+        else
+            printf '\n%b\n' " ${uyc} BUSINESS stack was not running or already removed"
+        fi
+    fi
+    
+    # Stop and remove infrastructure stack
+    if [[ -f "docker-compose-infrastructure.yml" ]] && [[ -f ".env-infrastructure" ]]; then
+        printf '\n%b\n' " ${uyc} Stopping INFRASTRUCTURE stack..."
+        show_loading_message "Shutting down infrastructure services" 2
+        
+        if $compose_cmd --env-file .env-infrastructure -f docker-compose-infrastructure.yml down --remove-orphans 2>/dev/null; then
+            printf '\n%b\n' " ${utick} INFRASTRUCTURE stack stopped and removed"
+        else
+            printf '\n%b\n' " ${uyc} INFRASTRUCTURE stack was not running or already removed"
+        fi
+    fi
+    
     # Remove any remaining containers that might be related
     printf '\n%b\n' " ${uyc} Checking for any remaining related containers..."
     local related_containers=(
         "gluetun" "qbittorrent" "sabnzbd" "sonarr" "radarr" "lidarr" "bazarr" "prowlarr"
-        "plex" "tautulli" "overseerr" "homarr" "ersatztv" "filebot" "jellyfin" "emby"
+        "filebot-node" "filebot-watcher" "plex" "tautulli" "overseerr" "ersatztv" "navidrome"
+        "retroarch" "komga" "audiobookshelf" "calibre-web" "noisedash" "swing-music"
+        "n8n" "n8n-postgres" "mealie" "mealie-db" "homarr" "uptime-kuma"
+        "watchtower-infrastructure"
     )
     
     for container in "${related_containers[@]}"; do
@@ -302,7 +341,7 @@ remove_docker_networks() {
     show_loading_message "Cleaning up network resources" 1
     
     # Remove specific networks
-    local networks=("servarr-network" "streamarr-network")
+    local networks=("servarr-network" "streamarr-network" "creatarr-network" "business-network" "infrastructure-network")
     
     for network in "${networks[@]}"; do
         if docker network ls --format "table {{.Name}}" | grep -q "^${network}$"; then
@@ -329,8 +368,10 @@ remove_docker_volumes() {
     local volumes=(
         "servarr_gluetun" "servarr_qbittorrent" "servarr_sabnzbd" "servarr_sonarr"
         "servarr_radarr" "servarr_lidarr" "servarr_bazarr" "servarr_prowlarr"
-        "streamarr_plex" "streamarr_tautulli" "streamarr_overseerr" "streamarr_homarr"
-        "streamarr_ersatztv" "streamarr_filebot" "streamarr_jellyfin" "streamarr_emby"
+        "servarr_filebot-data" "streamarr_plex" "streamarr_tautulli" "streamarr_overseerr"
+        "streamarr_ersatztv" "streamarr_navidrome" "creatarr_retroarch" "creatarr_komga"
+        "creatarr_audiobookshelf" "creatarr_calibre-web" "creatarr_noisedash" "creatarr_swing-music"
+        "business_n8n" "business_mealie" "infrastructure_homarr" "infrastructure_uptime-kuma"
     )
     
     for volume in "${volumes[@]}"; do
@@ -365,6 +406,9 @@ remove_docker_files_and_directories() {
     local docker_files=(
         ".env-servarr"
         ".env-streamarr"
+        ".env-creatarr"
+        ".env-business"
+        ".env-infrastructure"
     )
     
     # Remove generated environment files only
@@ -384,6 +428,9 @@ remove_docker_files_and_directories() {
     local backup_files=(
         ".env-servarr.bak"
         ".env-streamarr.bak"
+        ".env-creatarr.bak"
+        ".env-business.bak"
+        ".env-infrastructure.bak"
     )
     
     for file in "${backup_files[@]}"; do
@@ -400,12 +447,22 @@ remove_docker_files_and_directories() {
     local created_dirs=(
         "${base_path}/docker/servarr"
         "${base_path}/docker/streamarr"
+        "${base_path}/docker/creatarr"
+        "${base_path}/docker/business"
+        "${base_path}/docker/infrastructure"
         "${base_path}/data/downloads/complete"
         "${base_path}/data/downloads/incomplete"
         "${base_path}/data/media/movies"
         "${base_path}/data/media/tv"
         "${base_path}/data/media/music"
         "${base_path}/data/plex_transcode"
+        "${base_path}/data/roms"
+        "${base_path}/data/comics"
+        "${base_path}/data/audiobooks"
+        "${base_path}/data/podcasts"
+        "${base_path}/data/books"
+        "${base_path}/data/recipes"
+        "${base_path}/data/saves"
     )
     
     # Remove empty directories (in reverse order to handle nested dirs)
@@ -449,6 +506,13 @@ remove_docker_files_and_directories() {
     printf '\n%b\n' " ${clc}•${cend} ${base_path}/data/media/tv"
     printf '\n%b\n' " ${clc}•${cend} ${base_path}/data/media/music"
     printf '\n%b\n' " ${clc}•${cend} ${base_path}/data/plex_transcode"
+    printf '\n%b\n' " ${clc}•${cend} ${base_path}/data/roms"
+    printf '\n%b\n' " ${clc}•${cend} ${base_path}/data/comics"
+    printf '\n%b\n' " ${clc}•${cend} ${base_path}/data/audiobooks"
+    printf '\n%b\n' " ${clc}•${cend} ${base_path}/data/podcasts"
+    printf '\n%b\n' " ${clc}•${cend} ${base_path}/data/books"
+    printf '\n%b\n' " ${clc}•${cend} ${base_path}/data/recipes"
+    printf '\n%b\n' " ${clc}•${cend} ${base_path}/data/saves"
 }
 
 #################################################################################################################################################
@@ -490,7 +554,7 @@ cleanup_docker_system() {
 # Remove Docker networks (custom)
 #################################################################################################################################################
 remove_custom_networks() {
-    local networks=("servarr-network" "streamarr-network")
+    local networks=("servarr-network" "streamarr-network" "creatarr-network" "business-network" "infrastructure-network")
     for net in "${networks[@]}"; do
         if docker network ls | grep -q "${net}"; then
             # Check if any containers are attached
@@ -589,10 +653,10 @@ main() {
 ╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
     
     printf '\n%b\n' " ${uyc} ${cy}What was removed:${cend}"
-    printf '\n%b\n' " ${clc}•${cend} All Docker containers (gluetun, qbittorrent, sonarr, radarr, etc.)"
-    printf '\n%b\n' " ${clc}•${cend} Docker networks (servarr-network, streamarr-network)"
+    printf '\n%b\n' " ${clc}•${cend} All Docker containers (gluetun, qbittorrent, sonarr, radarr, plex, n8n, mealie, etc.)"
+    printf '\n%b\n' " ${clc}•${cend} Docker networks (servarr-network, streamarr-network, creatarr-network, business-network, infrastructure-network)"
     printf '\n%b\n' " ${clc}•${cend} Docker volumes (application data, databases)"
-    printf '\n%b\n' " ${clc}•${cend} Generated environment files (.env-servarr, .env-streamarr)"
+    printf '\n%b\n' " ${clc}•${cend} Generated environment files (.env-servarr, .env-streamarr, .env-creatarr, .env-business, .env-infrastructure)"
     printf '\n%b\n' " ${clc}•${cend} Empty directories created during setup"
     
     printf '\n%b\n' " ${uyc} ${cy}What was preserved:${cend}"

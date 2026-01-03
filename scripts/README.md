@@ -25,7 +25,7 @@ This directory contains utility scripts for maintaining your Homelab Media Stack
 - **Platform-specific configurations** (paths, permissions, PUID/PGID)
 - **Automated directory creation** with proper ownership
 - **Environment file configuration** with auto-detected IP and timezone
-- **Docker network creation** for dual-stack architecture
+- **Docker network creation** for multi-stack architecture
 - **VPN validation** and security checks
 - **Comprehensive service overview** with platform-specific notes
 
@@ -332,7 +332,7 @@ nano .env-servarr
 - Files accessible in Finder
 - Works on Intel and Apple Silicon
 
-For more detailed troubleshooting: [docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md)
+For more information, see the main [README.md](../README.md) and [docs/](../docs/) directory.
 
 ## 🌟 Universal Script Advantages
 

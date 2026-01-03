@@ -56,10 +56,11 @@ The first stable release of the Homelab Media Stack - a comprehensive, productio
 ### ✨ Features Added
 
 #### **Core Architecture**
-- **Dual-stack architecture** with proper network isolation (servarr + streamarr)
+- **Multi-stack architecture** with proper network isolation (5 stacks: SERVARR, STREAMARR, CREATARR, BUSINESS, INFRASTRUCTURE)
 - **VPN-protected downloads** via Gluetun with kill switch protection
 - **Shared data volumes** for seamless integration between stacks
 - **Inter-stack communication** via host networking
+- **Dedicated Watchtower** instance per stack for automatic updates
 
 #### **SERVARR STACK (Download & Management)**
 - **Gluetun VPN Gateway** - Routes all download traffic through VPN
@@ -72,7 +73,6 @@ The first stable release of the Homelab Media Stack - a comprehensive, productio
 - **Bazarr** - Subtitle management and automation (6767)
 - **FileBot Node** - File processing web interface (5452)
 - **FileBot Watcher** - Automated file processing and organization
-- **Homarr** - Unified service dashboard (7575)
 - **Watchtower** - Automatic container updates
 
 #### **STREAMARR STACK (Streaming & Requests)**
@@ -103,7 +103,6 @@ The first stable release of the Homelab Media Stack - a comprehensive, productio
 
 #### **Core Documentation**
 - **README.md** - Comprehensive project overview and setup guide
-- **COMMUNITY_IMPACT.md** - Project value and community impact analysis
 - **QUICK_START.md** - 30-minute setup guide for immediate deployment
 - **TROUBLESHOOTING.md** - Extensive troubleshooting guide with solutions
 - **CONTRIBUTING.md** - Community contribution guidelines and standards

@@ -1,0 +1,132 @@
+# =============================================================================
+# WEBSITES STACK - Custom Web Applications & Services
+# =============================================================================
+#
+# This stack is for hosting custom websites, web applications, and personal
+# web services. Users can add their own websites, APIs, or web applications here.
+#
+# Network: 172.44.0.0/24 (isolated from other stacks)
+# Data: Shared /data volume with other stacks (if needed)
+# Environment: Configure via .env-websites file
+#
+# Deploy: docker-compose --env-file .env-websites -f docker-compose-websites.yml up -d
+# =============================================================================
+
+version: '3.8'
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  websites-network:
+    name: websites-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.44.0.0/24
+          gateway: 172.44.0.1
+
+# =============================================================================
+# SERVICES
+# =============================================================================
+services:
+
+  # ---------------------------------------------------------------------------
+  # MINDKINDPROJECT-V2
+  # ---------------------------------------------------------------------------
+  # Custom website: MindKind Project v2
+  # Uncomment and customize based on your website type (static, Node.js, etc.)
+  
+  # mindkindproject-v2:
+  #   image: nginx:alpine
+  #   container_name: mindkindproject-v2
+  #   hostname: mindkindproject-v2
+  #   restart: unless-stopped
+  #   
+  #   networks:
+  #     websites-network:
+  #       ipv4_address: 172.44.0.2
+  #   
+  #   ports:
+  #     - "8001:80"  # Adjust port as needed
+  #   
+  #   environment:
+  #     - PUID=${PUID}
+  #     - PGID=${PGID}
+  #     - TZ=${TZ}
+  #   
+  #   volumes:
+  #     - ${WEBSITES_CONFIG_PATH}/mindkindproject-v2:/usr/share/nginx/html:ro
+  #     - /etc/localtime:/etc/localtime:ro
+  #   
+  #   labels:
+  #     - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # THEGARAGELABS.CC
+  # ---------------------------------------------------------------------------
+  # Custom website: The Garage Labs
+  # Uncomment and customize based on your website type (static, Node.js, etc.)
+  
+  # thegaragelabs-cc:
+  #   image: nginx:alpine
+  #   container_name: thegaragelabs-cc
+  #   hostname: thegaragelabs-cc
+  #   restart: unless-stopped
+  #   
+  #   networks:
+  #     websites-network:
+  #       ipv4_address: 172.44.0.3
+  #   
+  #   ports:
+  #     - "8002:80"  # Adjust port as needed
+  #   
+  #   environment:
+  #     - PUID=${PUID}
+  #     - PGID=${PGID}
+  #     - TZ=${TZ}
+  #   
+  #   volumes:
+  #     - ${WEBSITES_CONFIG_PATH}/thegaragelabs-cc:/usr/share/nginx/html:ro
+  #     - /etc/localtime:/etc/localtime:ro
+  #   
+  #   labels:
+  #     - "com.centurylinklabs.watchtower.enable=true"
+
+  # Note: Automatic updates handled by watchtower-infrastructure in INFRASTRUCTURE stack
+
+# =============================================================================
+# USAGE NOTES
+# =============================================================================
+#
+# ADDING YOUR CUSTOM WEBSITES:
+#
+# 1. Use the template services above (mindkindproject-v2, thegaragelabs-cc) as examples
+# 2. Update the image to match your application (nginx, apache, node, etc.)
+# 3. Set appropriate ports (avoid conflicts with other services)
+# 4. Configure volume mounts for your website files
+# 5. Update the IP address (increment from 172.44.0.3 for additional sites)
+# 6. Uncomment the service block
+# 7. Copy your website files to ${WEBSITES_CONFIG_PATH}/your-website-name/
+# 8. Redeploy the stack
+#
+# For detailed instructions, see: docs/WEBSITES_STACK_GUIDE.md
+#
+# COMMON WEBSITE IMAGES:
+# - nginx:alpine (static websites)
+# - httpd:alpine (Apache)
+# - node:alpine (Node.js applications)
+# - php:apache (PHP applications)
+# - python:alpine (Python web apps)
+#
+# VOLUME STRUCTURE:
+# ${WEBSITES_CONFIG_PATH}/your-website/  - Your website files
+#
+# NETWORK ISOLATION:
+# Websites are isolated in their own network (172.44.0.0/24)
+# They can communicate with other stacks via host networking if needed
+#
+# =============================================================================
+# END OF WEBSITES STACK CONFIGURATION
+# =============================================================================
+

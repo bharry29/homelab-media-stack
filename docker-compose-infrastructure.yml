@@ -1,0 +1,168 @@
+# =============================================================================
+# INFRASTRUCTURE STACK - System Management & Monitoring Services
+# =============================================================================
+#
+# This stack handles infrastructure and monitoring services:
+# • Service dashboard (Homarr)
+# • System monitoring (Uptime Kuma)
+# • Automatic updates (Watchtower)
+#
+# Network: 172.43.0.0/24 (isolated from other stacks)
+# Data: Shared /data volume with other stacks (if needed)
+# Environment: Configure via .env-infrastructure file
+#
+# Deploy: docker-compose --env-file .env-infrastructure -f docker-compose-infrastructure.yml up -d
+# =============================================================================
+
+version: '3.8'
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  infrastructure-network:
+    name: infrastructure-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.43.0.0/24
+          gateway: 172.43.0.1
+
+# =============================================================================
+# SERVICES
+# =============================================================================
+services:
+
+  # ---------------------------------------------------------------------------
+  # SERVICE DASHBOARD
+  # ---------------------------------------------------------------------------
+  # Unified dashboard for managing all homelab services
+  homarr:
+    image: ghcr.io/ajnart/homarr:latest
+    container_name: homarr
+    hostname: homarr
+    restart: unless-stopped
+    
+    # Direct network access
+    networks:
+      infrastructure-network:
+        ipv4_address: 172.43.0.2
+    
+    # External access to dashboard
+    ports:
+      - "${HOMARR_PORT:-7575}:7575"
+    
+    # User and system configuration
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    
+    # Persistent storage and Docker integration
+    volumes:
+      - ${INFRASTRUCTURE_CONFIG_PATH}/homarr/configs:/app/data/configs
+      - ${INFRASTRUCTURE_CONFIG_PATH}/homarr/icons:/app/public/icons
+      - ${INFRASTRUCTURE_CONFIG_PATH}/homarr/data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # SYSTEM MONITORING
+  # ---------------------------------------------------------------------------
+  # Uptime Kuma - System monitoring and uptime tracking
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: uptime-kuma
+    hostname: uptime-kuma
+    restart: unless-stopped
+    
+    # Direct network access
+    networks:
+      infrastructure-network:
+        ipv4_address: 172.43.0.3
+    
+    # External access to web interface
+    ports:
+      - "${UPTIME_KUMA_PORT:-3001}:3001"
+    
+    # User and system configuration
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    
+    # Persistent storage
+    volumes:
+      - ${INFRASTRUCTURE_CONFIG_PATH}/uptime-kuma:/app/data
+      - /etc/localtime:/etc/localtime:ro
+    
+    # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # AUTOMATIC UPDATES
+  # ---------------------------------------------------------------------------
+  # Automatic container updates with cleanup and notifications
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower-infrastructure
+    hostname: watchtower-infrastructure
+    restart: unless-stopped
+    
+    # Internal network (no external access needed)
+    networks:
+      infrastructure-network:
+        ipv4_address: 172.43.0.4
+    
+    # System configuration
+    environment:
+      - TZ=${TZ}
+      - WATCHTOWER_CLEANUP=${WATCHTOWER_CLEANUP:-true}
+      - WATCHTOWER_REMOVE_VOLUMES=${WATCHTOWER_REMOVE_VOLUMES:-false}
+      - WATCHTOWER_INCLUDE_STOPPED=${WATCHTOWER_INCLUDE_STOPPED:-true}
+      - WATCHTOWER_SCHEDULE=${WATCHTOWER_SCHEDULE:-0 6 * * *}
+      - WATCHTOWER_LABEL_ENABLE=${WATCHTOWER_LABEL_ENABLE:-true}
+      - WATCHTOWER_NOTIFICATIONS=${WATCHTOWER_NOTIFICATIONS:-}
+      - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL:-}
+      - WATCHTOWER_DEBUG=${WATCHTOWER_DEBUG:-false}
+    
+    # Docker socket access for container management
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  # Note: Portainer is managed separately via setup.sh
+
+# =============================================================================
+# INTEGRATION NOTES
+# =============================================================================
+#
+# INFRASTRUCTURE STACK INTEGRATION:
+# • Homarr provides unified dashboard for all homelab services
+# • Uptime Kuma monitors all services across all stacks
+# • Watchtower handles automatic updates for infrastructure services
+# • Can monitor services from SERVARR, STREAMARR, CREATARR, and BUSINESS stacks
+#
+# NETWORK COMMUNICATION:
+# • Infrastructure services: 172.43.0.0/24 network
+# • Servarr services: 172.39.0.0/24 network
+# • Streamarr services: 172.40.0.0/24 network
+# • Creatarr services: 172.41.0.0/24 network
+# • Business services: 172.42.0.0/24 network
+# • Inter-stack communication via host networking
+# • Homarr accesses Docker socket to discover all containers
+# • Uptime Kuma monitors services via HTTP/HTTPS endpoints
+#
+# DATA FLOW:
+# 1. Homarr: Discovers all Docker containers via socket
+# 2. Uptime Kuma: Monitors service health via configured endpoints
+# 3. Watchtower: Updates infrastructure stack containers automatically
+# 4. Users: Access unified dashboard and monitoring via web interfaces
+#
+# =============================================================================
+# END OF INFRASTRUCTURE STACK CONFIGURATION
+# =============================================================================
+

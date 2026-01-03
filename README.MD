@@ -2,34 +2,74 @@
 
 A comprehensive, production-ready Docker-based media automation stack for home servers and NAS systems. This project provides a complete solution for automated media acquisition, processing, streaming, and creative content management with enterprise-grade security through VPN integration.
 
-> **🚀 This project is actively growing!** We're continuously adding new services, stacks, and features. The current version includes 3 main stacks with 28 services, and we're planning to add more creative tools, productivity apps, and automation services.
+> **🚀 This project is actively growing!** We're continuously adding new services, stacks, and features. The current version includes 6 main stacks with 28+ services, each with dedicated Watchtower instances for automatic updates.
+
+> **🌐 Distributed Deployment Supported!** Each stack is completely independent and can be installed on separate machines. Deploy one stack per machine, or group them as needed - the choice is yours! See [Distributed Deployment](#distributed-deployment-) section below.
 
 ## Architecture Overview
 
 This stack uses a **multi-stack architecture** with proper network isolation and shared data volumes:
 
-### **SERVARR STACK** (Download & Management)
-- **Network**: `172.39.0.0/24` (isolated)
+### **SERVARR STACK** (Media Management & Downloads)
+- **Network**: `172.39.0.0/24` (Gateway: `172.39.0.1`) (isolated)
 - **Purpose**: Handles all download and media management operations
 - **VPN Protection**: All download traffic routed through Gluetun VPN gateway
-- **Services**: 13 containers including VPN, downloaders, *arr apps, and monitoring
+- **Services**: 10 containers including VPN, downloaders, *arr apps, and FileBot (updates handled by infrastructure watchtower)
 
 ### **STREAMARR STACK** (Streaming & Requests)
-- **Network**: `172.40.0.0/24` (isolated) 
+- **Network**: `172.40.0.0/24` (Gateway: `172.40.0.1`) (isolated) 
 - **Purpose**: Handles media streaming and user request management
 - **Data Access**: Read-only access to organized media files
-- **Services**: 5 containers including Plex, request management, and analytics
+- **Services**: 5 containers including Plex, request management, and analytics (updates handled by infrastructure watchtower)
 
-### **CREATARR STACK** (Creative & Productivity) 🆕
-- **Network**: `172.41.0.0/24` (isolated)
-- **Purpose**: Creative content creation, family management, and productivity tools
-- **Services**: 10 containers including workflow automation, recipe management, music creation, gaming, and databases
-- **Features**: n8n workflows, Mealie recipes, Noisedash ambient sounds, Swing Music player, and more
+### **CREATARR STACK** (Creative & Entertainment)
+- **Network**: `172.41.0.0/24` (Gateway: `172.41.0.1`) (isolated)
+- **Purpose**: Creative content and entertainment services
+- **Services**: 6 containers including gaming, comics, audiobooks, e-books, and music tools (updates handled by infrastructure watchtower)
+
+### **BUSINESS STACK** (Business & Productivity) 🆕
+- **Network**: `172.42.0.0/24` (Gateway: `172.42.0.1`) (isolated)
+- **Purpose**: Business and productivity tools
+- **Services**: 4 containers including n8n workflows and Mealie recipes (updates handled by infrastructure watchtower)
+
+### **INFRASTRUCTURE STACK** (System Management) 🆕
+- **Network**: `172.43.0.0/24` (Gateway: `172.43.0.1`) (isolated)
+- **Purpose**: System monitoring and dashboard
+- **Services**: 3 containers including Homarr dashboard, Uptime Kuma monitoring, and Watchtower (monitors all labeled containers)
+
+### **WEBSITES STACK** (Custom Web Applications) 🆕
+- **Network**: `172.44.0.0/24` (Gateway: `172.44.0.1`) (isolated)
+- **Purpose**: Host custom websites, web applications, and personal web services
+- **Services**: User-defined websites (updates handled by infrastructure watchtower)
+- **Note**: This stack is a template for users to add their own custom websites and web applications
 
 ### **Shared Integration**
-- **Data Volume**: `/volume1/data` shared between all stacks
+- **Data Volume**: `/volume1/data` shared between all stacks (or independent per machine)
 - **Communication**: Inter-stack communication via host networking
 - **Processing Flow**: Downloads → FileBot Processing → Organized Media → Streaming + Creative Tools
+- **Auto-Updates**: Centralized Watchtower in infrastructure stack monitors all labeled containers
+
+### **Distributed Deployment** 🌐
+**✅ Each stack can be installed on a separate machine!**
+
+- **Complete Independence**: Each stack has its own docker-compose file, network, and environment
+- **No Cross-Stack Dependencies**: Deploy any stack without requiring others
+- **Flexible Distribution**: Install one stack per machine, or group them as needed
+- **Data Options**: Use independent data paths per machine, or share via NFS/NAS
+
+**Example:**
+```bash
+# Machine 1 - SERVARR only
+docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
+
+# Machine 2 - STREAMARR only  
+docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
+
+# Machine 3 - CREATARR only
+docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml up -d
+```
+
+**Note**: When deploying on separate machines, configure services with IP addresses for inter-stack communication (e.g., Overseerr → Sonarr/Radarr on different machines).
 
 ## Stack Components
 
@@ -47,9 +87,6 @@ This stack uses a **multi-stack architecture** with proper network isolation and
 | **Bazarr** | Subtitle Management | 6767 | Direct |
 | **FileBot Node** | File Processing UI | 5452 | Direct |
 | **FileBot Watcher** | Auto File Processing | - | Internal |
-| **Homarr** | Service Dashboard | 7575 | Direct |
-| **Uptime Kuma** | System Monitoring | 3001 | Direct |
-| **Watchtower** | Auto Updates | - | Internal |
 
 ### STREAMARR STACK Services
 
@@ -61,7 +98,18 @@ This stack uses a **multi-stack architecture** with proper network isolation and
 | **ErsatzTV** | Virtual TV Channels | 8409 | Direct |
 | **Navidrome** | Music Streaming Server | 4533 | Direct |
 
-### CREATARR STACK Services 🆕
+### CREATARR STACK Services
+
+| Service | Purpose | Port | Network |
+|---------|---------|------|---------|
+| **RetroArch** | Gaming Emulator | 8081 | Direct |
+| **Komga** | Comic Book Server | 25600 | Direct |
+| **Audiobookshelf** | Audiobook Server | 13378 | Direct |
+| **Calibre-Web** | E-book Management | 8083 | Direct |
+| **Noisedash** | Ambient Sound Generator | 3002 | Direct |
+| **Swing Music** | Music Player | 1970 | Direct |
+
+### BUSINESS STACK Services 🆕
 
 | Service | Purpose | Port | Network |
 |---------|---------|------|---------|
@@ -69,12 +117,80 @@ This stack uses a **multi-stack architecture** with proper network isolation and
 | **n8n-postgres** | n8n Database | 5432 | Internal |
 | **Mealie** | Recipe Management | 9001 | Direct |
 | **mealie-db** | Mealie Database | 5432 | Internal |
-| **Noisedash** | Ambient Sound Generator | 3002 | Direct |
-| **Swing Music** | Music Player | 1970 | Direct |
-| **RetroArch** | Gaming Emulator | 8081 | Direct |
-| **Komga** | Comic Book Server | 25600 | Direct |
-| **Audiobookshelf** | Audiobook Server | 13378 | Direct |
-| **Calibre-Web** | E-book Management | 8083 | Direct |
+
+### INFRASTRUCTURE STACK Services 🆕
+
+| Service | Purpose | Port | Network |
+|---------|---------|------|---------|
+| **Homarr** | Service Dashboard | 7575 | Direct |
+| **Uptime Kuma** | System Monitoring | 3001 | Direct |
+| **Watchtower** | Auto Updates (All Stacks) | - | Internal |
+
+### WEBSITES STACK Services 🆕
+
+| Service | Purpose | Port | Network |
+|---------|---------|------|---------|
+| **Custom Websites** | User-defined web applications | User-defined | Direct |
+
+> **Note**: The WEBSITES stack is a template for hosting your own custom websites and web applications. See [Websites Stack Guide](docs/WEBSITES_STACK_GUIDE.md) for detailed instructions on adding your websites.
+
+## 🚀 Quick Start
+
+### New Installation
+
+**Option A: Single Machine (All Stacks)**
+If you're setting up for the first time, use the automated setup script:
+
+```bash
+chmod +x scripts/setup.sh
+sudo ./scripts/setup.sh
+```
+
+The script will guide you through:
+- Platform detection
+- Stack selection (choose which stacks to install)
+- Service selection (choose specific services from each stack)
+- Directory creation
+- Environment configuration
+- Container deployment
+
+**Option B: Distributed Deployment (One Stack Per Machine)** 🌐
+Each stack can be installed independently on separate machines:
+
+```bash
+# On Machine 1 - Deploy SERVARR stack only
+docker-compose --env-file .env-servarr -f docker-compose-servarr.yml up -d
+
+# On Machine 2 - Deploy STREAMARR stack only
+docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
+
+# On Machine 3 - Deploy CREATARR stack only
+docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml up -d
+
+# On Machine 4 - Deploy BUSINESS stack only
+docker-compose --env-file .env-business -f docker-compose-business.yml up -d
+
+# On Machine 5 - Deploy INFRASTRUCTURE stack only
+docker-compose --env-file .env-infrastructure -f docker-compose-infrastructure.yml up -d
+
+# On Machine 6 - Deploy WEBSITES stack only
+docker-compose --env-file .env-websites -f docker-compose-websites.yml up -d
+```
+
+**Benefits of Distributed Deployment:**
+- ✅ Complete isolation between stacks
+- ✅ Resource optimization per machine
+- ✅ Independent scaling and updates
+- ✅ No cross-stack dependencies
+- ✅ Mix and match based on hardware capabilities
+
+**Data Sharing Options:**
+- **Independent**: Each machine has its own data directory
+- **Shared Storage**: Mount NFS/NAS for shared data access
+- **Hybrid**: Some data local, some shared (e.g., media library shared, configs local)
+
+### Updating Existing Setup
+To update existing stacks, simply redeploy them using the same commands as new installations. Docker Compose will automatically update containers while preserving all data volumes.
 
 ## Prerequisites
 
@@ -236,7 +352,7 @@ Ready to deploy the homelab media stack!
 
 [████████████████████] 100% Complete
 SERVARR stack deployed successfully!
-Services: Gluetun (VPN), qBittorrent, SABnzbd, Prowlarr, Sonarr, Radarr, Lidarr, Bazarr, FileBot, Homarr
+Services: Gluetun (VPN), qBittorrent, SABnzbd, Prowlarr, Sonarr, Radarr, Lidarr, Bazarr, FileBot
 
 Waiting for VPN connection to establish (30 seconds)...
 VPN is working! External IP: 185.xxx.xxx.xxx
@@ -268,7 +384,6 @@ Services: n8n, Mealie, Noisedash, Swing Music, RetroArch
 ║                        SERVARR STACK (Download & Management)                 ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-Homarr Dashboard:     http://192.168.1.100:7575
 qBittorrent:         http://192.168.1.100:8080
 SABnzbd:             http://192.168.1.100:8090
 Prowlarr:            http://192.168.1.100:9696
@@ -314,7 +429,7 @@ Next Steps:
 10. Add audiobooks to Audiobookshelf
 11. Import e-books to Calibre-Web
 
-For detailed configuration guide: docs/QUICK_START.md
+For detailed setup instructions, use the interactive setup script: `./scripts/setup.sh`
 
 ---
 
@@ -605,8 +720,8 @@ docker restart mealie
 **Permission Issues:**
 ```bash
 # Fix database directory permissions
-sudo chown -R 999:999 /volume1/docker/creatarr/mealie-db
-sudo chmod -R 700 /volume1/docker/creatarr/mealie-db
+sudo chown -R 999:999 /volume1/docker/business/mealie-db
+sudo chmod -R 700 /volume1/docker/business/mealie-db
 ```
 
 #### **Port Conflicts**
@@ -631,12 +746,12 @@ docker ps --format "table {{.Names}}\t{{.Ports}}"
 **PostgreSQL Permission Fix:**
 ```bash
 # Set correct ownership for database directories
-sudo chown -R 999:999 /volume1/docker/creatarr/n8n-postgres
-sudo chown -R 999:999 /volume1/docker/creatarr/mealie-db
+sudo chown -R 999:999 /volume1/docker/business/n8n-postgres
+sudo chown -R 999:999 /volume1/docker/business/mealie-db
 
 # Set correct permissions
-sudo chmod -R 700 /volume1/docker/creatarr/n8n-postgres
-sudo chmod -R 700 /volume1/docker/creatarr/mealie-db
+sudo chmod -R 700 /volume1/docker/business/n8n-postgres
+sudo chmod -R 700 /volume1/docker/business/mealie-db
 ```
 
 #### **n8n HTTPS/Domain Configuration**
@@ -665,7 +780,7 @@ openssl rand -base64 32
 3. **Key Management:**
 - **New Setup**: Use generated key from setup script
 - **Existing n8n**: Extract key from your n8n config file
-- **Key Location**: `~/.n8n/config` or `${CREATARR_CONFIG_PATH}/n8n/config`
+- **Key Location**: `~/.n8n/config` or `${BUSINESS_CONFIG_PATH}/n8n/config`
 - **Key Format**: Base64 encoded string (32+ characters)
 
 4. **Configure Nginx Proxy Manager:**
@@ -725,10 +840,10 @@ docker stop $(docker ps -aq)
 docker rm $(docker ps -aq)
 
 # Remove networks
-docker network rm servarr-network streamarr-network creatarr-network
+docker network rm servarr-network streamarr-network creatarr-network business-network infrastructure-network
 
 # Remove generated files
-rm -f .env-servarr .env-streamarr .env-creatarr
+rm -f .env-servarr .env-streamarr .env-creatarr .env-business .env-infrastructure
 
 # Remove empty directories (be careful!)
 find /volume1/docker -type d -empty -delete
@@ -737,7 +852,7 @@ find /volume1/data -type d -empty -delete
 
 ### **Getting Help**
 
-- **Setup Issues**: Use the automated setup script or check [Troubleshooting Guide](docs/TROUBLESHOOTING.md)
+- **Setup Issues**: Use the automated setup script or check the documentation in the [docs/](docs/) directory
 - **Documentation**: Check the [docs/](docs/) directory
 - **Bug Reports**: Open a [GitHub issue](https://github.com/bharry29/homelab-media-stack/issues)
 - **Discussions**: Join [GitHub Discussions](https://github.com/bharry29/homelab-media-stack/discussions)
@@ -762,8 +877,8 @@ The authors assume no responsibility for misuse of this software.
 This project is **actively growing** and evolving! Here's what we're working on:
 
 ### **Current Status (v2.0)**
-- ✅ **3 Main Stacks**: SERVARR, STREAMARR, CREATARR
-- ✅ **28 Services**: Complete media automation ecosystem
+- ✅ **5 Main Stacks**: SERVARR, STREAMARR, CREATARR, BUSINESS, INFRASTRUCTURE
+- ✅ **28+ Services**: Complete media automation ecosystem
 - ✅ **Cross-Platform Support**: Works on all major platforms
 - ✅ **Automated Setup**: One-command deployment
 - ✅ **Comprehensive Documentation**: Complete guides and troubleshooting

@@ -427,25 +427,42 @@ create_directories_for_platform() {
     printf '\n%b\n' " ${uyc} Creating directory structure for ${clc}${platform}${cend}..."
     show_loading_message "Setting up directory structure" 1
     
-    # Directory list
-    directories=(
-        "${base_path}/docker/servarr"
-        "${base_path}/docker/streamarr"
-        "${base_path}/docker/creatarr"
-        "${base_path}/data/downloads/complete"
-        "${base_path}/data/downloads/incomplete"
-        "${base_path}/data/media/movies"
-        "${base_path}/data/media/tv"
-        "${base_path}/data/media/music"
-        "${base_path}/data/plex_transcode"
-        "${base_path}/data/roms"
-        "${base_path}/data/comics"
-        "${base_path}/data/audiobooks"
-        "${base_path}/data/podcasts"
-        "${base_path}/data/books"
-        "${base_path}/data/recipes"
-        "${base_path}/data/saves"
-    )
+    # Start with base directories
+    local directories=()
+    
+    # Add stack directories based on selection
+    if [[ " ${stacks_to_install[@]} " =~ " servarr " ]]; then
+        directories+=("${base_path}/docker/servarr")
+        directories+=("${base_path}/data/downloads/complete")
+        directories+=("${base_path}/data/downloads/incomplete")
+        directories+=("${base_path}/data/media/movies")
+        directories+=("${base_path}/data/media/tv")
+        directories+=("${base_path}/data/media/music")
+    fi
+    
+    if [[ " ${stacks_to_install[@]} " =~ " streamarr " ]]; then
+        directories+=("${base_path}/docker/streamarr")
+        directories+=("${base_path}/data/plex_transcode")
+    fi
+    
+    if [[ " ${stacks_to_install[@]} " =~ " creatarr " ]]; then
+        directories+=("${base_path}/docker/creatarr")
+        directories+=("${base_path}/data/roms")
+        directories+=("${base_path}/data/comics")
+        directories+=("${base_path}/data/audiobooks")
+        directories+=("${base_path}/data/podcasts")
+        directories+=("${base_path}/data/books")
+        directories+=("${base_path}/data/saves")
+    fi
+    
+    if [[ " ${stacks_to_install[@]} " =~ " business " ]]; then
+        directories+=("${base_path}/docker/business")
+        directories+=("${base_path}/data/recipes")
+    fi
+    
+    if [[ " ${stacks_to_install[@]} " =~ " infrastructure " ]]; then
+        directories+=("${base_path}/docker/infrastructure")
+    fi
     
     # Create directories with progress
     local total_dirs=${#directories[@]}
@@ -583,6 +600,9 @@ check_prerequisites() {
         printf '\n%b\n' " ${utick} Docker Compose found: ${clc}${compose_version}${cend}"
     fi
     
+    # Check if Portainer is already installed
+    check_portainer_installed
+    
     # Check permissions (platform-specific)
     case "$platform" in
         "linux"|"proxmox")
@@ -603,6 +623,36 @@ check_prerequisites() {
     esac
     
     printf '\n%b\n' " ${utick} All prerequisites met!"
+}
+
+#################################################################################################################################################
+# Portainer detection
+#################################################################################################################################################
+check_portainer_installed() {
+    # Check if Portainer container is running or exists
+    portainer_container=$(docker ps -a --format '{{.Names}}' | grep -iE 'portainer|portainer-ce|portainer-agent' | head -1)
+    
+    if [[ -n "$portainer_container" ]]; then
+        # Check if it's running
+        if docker ps --format '{{.Names}}' | grep -qiE 'portainer|portainer-ce|portainer-agent'; then
+            portainer_status="running"
+            portainer_port=$(docker port "$portainer_container" 2>/dev/null | grep -oP ':\K[0-9]+' | head -1 || echo "9000")
+            printf '\n%b\n' " ${utick} Portainer detected (already installed): ${clc}${portainer_container}${cend} (port ${clc}${portainer_port}${cend})"
+            printf '\n%b\n' " ${uyc} Setup will continue with existing Portainer installation"
+            export PORTAINER_INSTALLED=true
+            export PORTAINER_CONTAINER="$portainer_container"
+            export PORTAINER_PORT="$portainer_port"
+        else
+            portainer_status="stopped"
+            printf '\n%b\n' " ${uyc} Portainer container found but not running: ${clc}${portainer_container}${cend}"
+            printf '\n%b\n' " ${uyc} You can start it manually with: ${clc}docker start ${portainer_container}${cend}"
+            export PORTAINER_INSTALLED=true
+            export PORTAINER_CONTAINER="$portainer_container"
+        fi
+    else
+        printf '\n%b\n' " ${uyc} Portainer not detected - will be managed separately if needed"
+        export PORTAINER_INSTALLED=false
+    fi
 }
 
 show_docker_install_instructions() {
@@ -653,6 +703,671 @@ show_compose_install_instructions() {
             printf '\n%b\n' " ${clc}•${cend} Visit: https://docs.docker.com/compose/install/"
             ;;
     esac
+}
+
+#################################################################################################################################################
+# Interactive Selection Menus
+#################################################################################################################################################
+show_multi_select_menu() {
+    local title="$1"
+    shift
+    local options=("$@")
+    local selected=()
+    local cursor=0
+    
+    printf '\n%b\n' " ${cy}${title}${cend}"
+    printf '\n%b\n' " ${uyc} Use ${clc}SPACE${cend} to select/deselect, ${clc}ENTER${cend} to confirm"
+    printf '\n%b\n' " ${uyc} Selected items will be marked with ${clg}[✓]${cend}"
+    printf '\n'
+    
+    # Initialize all as unselected
+    local selected_flags=()
+    for ((i=0; i<${#options[@]}; i++)); do
+        selected_flags[$i]=0
+    done
+    
+    while true; do
+        # Clear screen and redraw menu
+        clear
+        printf '\n%b\n' " ${cy}${title}${cend}"
+        printf '\n%b\n' " ${uyc} Use ${clc}SPACE${cend} to select/deselect, ${clc}ENTER${cend} to confirm"
+        printf '\n'
+        
+        # Display options
+        for ((i=0; i<${#options[@]}; i++)); do
+            if [[ $i -eq $cursor ]]; then
+                if [[ ${selected_flags[$i]} -eq 1 ]]; then
+                    printf '%b\n' " ${clc}▶${cend} ${clg}[✓]${cend} ${options[$i]}"
+                else
+                    printf '%b\n' " ${clc}▶${cend} ${cy}[ ]${cend} ${options[$i]}"
+                fi
+            else
+                if [[ ${selected_flags[$i]} -eq 1 ]]; then
+                    printf '%b\n' "   ${clg}[✓]${cend} ${options[$i]}"
+                else
+                    printf '%b\n' "   ${cy}[ ]${cend} ${options[$i]}"
+                fi
+            fi
+        done
+        
+        printf '\n'
+        if [[ ${#selected[@]} -gt 0 ]]; then
+            printf '%b\n' " ${ugc} Selected: ${clc}${#selected[@]}${cend} item(s)"
+        else
+            printf '%b\n' " ${uyc} No items selected"
+        fi
+        
+        # Read single character
+        read -rsn1 key
+        
+        case "$key" in
+            $'\x1b')  # ESC sequence
+                read -rsn1 -t 0.1 tmp
+                if [[ "$tmp" == "[" ]]; then
+                    read -rsn1 -t 0.1 tmp
+                    case "$tmp" in
+                        "A")  # Up arrow
+                            if [[ $cursor -gt 0 ]]; then
+                                ((cursor--))
+                            fi
+                            ;;
+                        "B")  # Down arrow
+                            if [[ $cursor -lt $((${#options[@]} - 1)) ]]; then
+                                ((cursor++))
+                            fi
+                            ;;
+                    esac
+                fi
+                ;;
+            " ")  # Space to toggle
+                if [[ ${selected_flags[$cursor]} -eq 0 ]]; then
+                    selected_flags[$cursor]=1
+                    selected+=("${options[$cursor]}")
+                else
+                    selected_flags[$cursor]=0
+                    # Remove from selected array
+                    local new_selected=()
+                    for item in "${selected[@]}"; do
+                        if [[ "$item" != "${options[$cursor]}" ]]; then
+                            new_selected+=("$item")
+                        fi
+                    done
+                    selected=("${new_selected[@]}")
+                fi
+                ;;
+            "")  # Enter to confirm
+                if [[ ${#selected[@]} -eq 0 ]]; then
+                    printf '\n%b\n' " ${ucross} Please select at least one item"
+                    sleep 1
+                else
+                    break
+                fi
+                ;;
+        esac
+    done
+    
+    # Return selected items via global array
+    declare -g selected_items=("${selected[@]}")
+}
+
+# Simplified multi-select for basic terminals (fallback)
+show_simple_multi_select() {
+    local title="$1"
+    shift
+    local options=("$@")
+    local selected=()
+    
+    printf '\n%b\n' " ${cy}${title}${cend}"
+    printf '\n%b\n' " ${uyc} Enter numbers separated by spaces (e.g., 1 3 5) or 'all' for everything"
+    printf '\n'
+    
+    # Display options
+    for ((i=0; i<${#options[@]}; i++)); do
+        printf '%b\n' " ${clc}$((i+1)))${cend} ${options[$i]}"
+    done
+    
+    printf '\n'
+    while true; do
+        printf '%b' " ${uyc} Select items: "
+        read -r input
+        
+        if [[ "$input" == "all" ]] || [[ "$input" == "ALL" ]]; then
+            selected=("${options[@]}")
+            break
+        fi
+        
+        # Parse input
+        local valid=true
+        local temp_selected=()
+        for num in $input; do
+            if [[ "$num" =~ ^[0-9]+$ ]] && [[ $num -ge 1 ]] && [[ $num -le ${#options[@]} ]]; then
+                temp_selected+=("${options[$((num-1))]}")
+            else
+                valid=false
+                break
+            fi
+        done
+        
+        if [[ "$valid" == true ]] && [[ ${#temp_selected[@]} -gt 0 ]]; then
+            selected=("${temp_selected[@]}")
+            break
+        else
+            printf '\n%b\n' " ${ucross} Invalid selection. Please enter numbers between 1 and ${#options[@]}"
+        fi
+    done
+    
+    # Return selected items
+    declare -g selected_items=("${selected[@]}")
+}
+
+select_stacks() {
+    clear
+    printf '\n%b\n' "${clg}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+    printf '\n%b\n' "${clg}║                                                                               ║${cend}"
+    printf '\n%b\n' "${clg}║                    📦 STACK SELECTION                                         ║${cend}"
+    printf '\n%b\n' "${clg}║                                                                               ║${cend}"
+    printf '\n%b\n' "${clg}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+    
+    printf '\n%b\n' " ${cy}Choose which stacks you want to install:${cend}"
+    printf '\n%b\n' " ${uyc} ${clc}Tip:${cend} Enter numbers separated by spaces (e.g., ${clc}1 3 5${cend}) or ${clc}all${cend} for everything"
+    printf '\n'
+    
+    # INFRASTRUCTURE is mandatory - always included
+    declare -g stacks_to_install=("infrastructure")
+    
+    local stack_options=(
+        "INFRASTRUCTURE - System Management (REQUIRED)"
+        "  └─ Homarr (Dashboard), Uptime Kuma (Monitoring), Watchtower (Auto Updates for all stacks)"
+        "SERVARR - Media Management & Downloads"
+        "  └─ VPN, qBittorrent, Sonarr, Radarr, Lidarr, Bazarr, Prowlarr, FileBot"
+        "STREAMARR - Streaming & Consumption"
+        "  └─ Plex, Overseerr, Tautulli, ErsatzTV, Navidrome"
+        "CREATARR - Creative & Entertainment"
+        "  └─ RetroArch, Komga, Audiobookshelf, Calibre-Web, Noisedash, Swing Music"
+        "BUSINESS - Business & Productivity"
+        "  └─ n8n (Workflow Automation), Mealie (Recipe Management)"
+    )
+    
+    # Display options with better formatting
+    local option_num=1
+    local actual_options=()
+    for ((i=0; i<${#stack_options[@]}; i++)); do
+        if [[ "${stack_options[$i]}" =~ ^[A-Z]+ ]]; then
+            if [[ "${stack_options[$i]}" =~ "REQUIRED" ]]; then
+                printf '\n%b\n' " ${clc}${option_num})${cend} ${clg}${stack_options[$i]}${cend} ${cy}(Auto-selected)${cend}"
+            else
+                printf '\n%b\n' " ${clc}${option_num})${cend} ${clg}${stack_options[$i]}${cend}"
+            fi
+            actual_options+=("${stack_options[$i]}")
+            ((option_num++))
+        else
+            printf '%b\n' " ${stack_options[$i]}"
+        fi
+    done
+    
+    printf '\n'
+    printf '%b\n' " ${cy}Note:${cend} INFRASTRUCTURE stack is ${clg}required${cend} and automatically selected"
+    printf '\n'
+    while true; do
+        printf '%b' " ${uyc} Select additional stacks ${clc}[1-4, all]:${cend} "
+        read -r input
+        
+        if [[ -z "$input" ]]; then
+            # If empty, just use infrastructure (already selected)
+            printf '\n%b\n' " ${utick} ${clg}INFRASTRUCTURE stack selected (required)${cend}"
+            printf '\n%b\n' " ${uyc} Selected: ${clc}1${cend} stack (INFRASTRUCTURE)"
+            return 0
+        fi
+        
+        if [[ "$input" == "all" ]] || [[ "$input" == "ALL" ]]; then
+            # Select all additional stacks (infrastructure already included)
+            stacks_to_install+=("servarr" "streamarr" "creatarr" "business")
+            printf '\n%b\n' " ${utick} ${clg}All stacks selected!${cend}"
+            printf '\n%b\n' " ${uyc} Selected: ${clc}${#stacks_to_install[@]}${cend} stacks"
+            for stack in "${stacks_to_install[@]}"; do
+                if [[ "$stack" == "infrastructure" ]]; then
+                    printf '%b\n' " ${clc}  ✓${cend} ${stack} ${cy}(required)${cend}"
+                else
+                    printf '%b\n' " ${clc}  ✓${cend} ${stack}"
+                fi
+            done
+            return 0
+        fi
+        
+        # Parse input
+        local valid=true
+        local temp_selected=()
+        for num in $input; do
+            if [[ "$num" =~ ^[0-9]+$ ]] && [[ $num -ge 1 ]] && [[ $num -le 4 ]]; then
+                case "$num" in
+                    1) temp_selected+=("servarr") ;;
+                    2) temp_selected+=("streamarr") ;;
+                    3) temp_selected+=("creatarr") ;;
+                    4) temp_selected+=("business") ;;
+                esac
+            else
+                valid=false
+                break
+            fi
+        done
+        
+        if [[ "$valid" == true ]] && [[ ${#temp_selected[@]} -gt 0 ]]; then
+            # Add selected stacks to infrastructure (which is already included)
+            for stack in "${temp_selected[@]}"; do
+                if [[ ! " ${stacks_to_install[@]} " =~ " ${stack} " ]]; then
+                    stacks_to_install+=("$stack")
+                fi
+            done
+            
+            printf '\n%b\n' " ${utick} ${clg}Stacks selected!${cend}"
+            printf '\n%b\n' " ${uyc} Selected: ${clc}${#stacks_to_install[@]}${cend} stack(s):"
+            for stack in "${stacks_to_install[@]}"; do
+                if [[ "$stack" == "infrastructure" ]]; then
+                    printf '%b\n' " ${clc}  ✓${cend} ${stack} ${cy}(required)${cend}"
+                else
+                    printf '%b\n' " ${clc}  ✓${cend} ${stack}"
+                fi
+            done
+            
+            # Initialize service arrays
+            declare -g services_servarr=()
+            declare -g services_streamarr=()
+            declare -g services_creatarr=()
+            declare -g services_business=()
+            declare -g services_infrastructure=()
+            
+            return 0
+        else
+            printf '\n%b\n' " ${ucross} Invalid selection. Please enter numbers between ${clc}1-5${cend} or ${clc}all${cend}"
+        fi
+    done
+}
+
+select_services() {
+    local stack_name="$1"
+    local stack_display="$2"
+    
+    clear
+    printf '\n%b\n' "${clc}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+    printf '\n%b\n' "${clc}║                                                                               ║${cend}"
+    printf '\n%b\n' "${clc}║                    🔧 ${stack_display} SERVICE SELECTION                      ║${cend}"
+    printf '\n%b\n' "${clc}║                                                                               ║${cend}"
+    printf '\n%b\n' "${clc}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+    
+    local service_options=()
+    local service_descriptions=()
+    local service_map=()
+    
+    case "$stack_name" in
+        "servarr")
+            service_options=(
+                "Gluetun (VPN Gateway)"
+                "qBittorrent (BitTorrent Client)"
+                "SABnzbd (Usenet Client)"
+                "Prowlarr (Indexer Management)"
+                "Sonarr (TV Show Automation)"
+                "Radarr (Movie Automation)"
+                "Lidarr (Music Automation)"
+                "Bazarr (Subtitle Management)"
+                "FileBot Node (File Processing UI)"
+                "FileBot Watcher (Auto File Processing)"
+                "Watchtower (Auto Updates)"
+            )
+            service_descriptions=(
+                "REQUIRED for secure downloads"
+                "Download torrents"
+                "Download from Usenet"
+                "Manage indexers"
+                "Automate TV show downloads"
+                "Automate movie downloads"
+                "Automate music downloads"
+                "Manage subtitles"
+                "File organization UI"
+                "Automatic file processing"
+                "Keep containers updated"
+            )
+            service_map=("gluetun" "qbittorrent" "sabnzbd" "prowlarr" "sonarr" "radarr" "lidarr" "bazarr" "filebot-node" "filebot-watcher" "watchtower")
+            ;;
+        "streamarr")
+            service_options=(
+                "Plex (Media Server)"
+                "Overseerr (Request Management)"
+                "Tautulli (Analytics & Monitoring)"
+                "ErsatzTV (Virtual TV Channels)"
+                "Navidrome (Music Streaming Server)"
+                "Watchtower (Auto Updates)"
+            )
+            service_descriptions=(
+                "Stream your media library"
+                "Request movies/TV shows"
+                "Monitor Plex usage"
+                "Create virtual TV channels"
+                "Stream music collection"
+                "Keep containers updated"
+            )
+            service_map=("plex" "overseerr" "tautulli" "ersatztv" "navidrome" "watchtower")
+            ;;
+        "creatarr")
+            service_options=(
+                "RetroArch (Gaming Emulator)"
+                "Komga (Comic Book Server)"
+                "Audiobookshelf (Audiobook Server)"
+                "Calibre-Web (E-book Management)"
+                "Noisedash (Ambient Sound Generator)"
+                "Swing Music (Music Player)"
+                "Watchtower (Auto Updates)"
+            )
+            service_descriptions=(
+                "Play retro games"
+                "Read comics online"
+                "Listen to audiobooks"
+                "Manage e-book library"
+                "Ambient sounds & music"
+                "Modern music player"
+                "Keep containers updated"
+            )
+            service_map=("retroarch" "komga" "audiobookshelf" "calibre-web" "noisedash" "swing-music" "watchtower")
+            ;;
+        "business")
+            service_options=(
+                "n8n (Workflow Automation)"
+                "n8n-postgres (n8n Database)"
+                "Mealie (Recipe Management)"
+                "mealie-db (Mealie Database)"
+                "Watchtower (Auto Updates)"
+            )
+            service_descriptions=(
+                "Automate workflows & tasks"
+                "Database for n8n (auto-added if n8n selected)"
+                "Manage recipes & meal planning"
+                "Database for Mealie (auto-added if Mealie selected)"
+                "Keep containers updated"
+            )
+            service_map=("n8n" "n8n-postgres" "mealie" "mealie-db" "watchtower")
+            ;;
+        "infrastructure")
+            service_options=(
+                "Homarr (Service Dashboard)"
+                "Uptime Kuma (System Monitoring)"
+                "Watchtower (Auto Updates)"
+            )
+            service_descriptions=(
+                "Unified dashboard for all services"
+                "Monitor uptime & health"
+                "Keep containers updated"
+            )
+            service_map=("homarr" "uptime-kuma" "watchtower")
+            ;;
+    esac
+    
+    printf '\n%b\n' " ${cy}Choose which services to install from ${clc}${stack_display}${cy}:${cend}"
+    printf '\n%b\n' " ${uyc} ${clc}Tip:${cend} Enter numbers separated by spaces (e.g., ${clc}1 3 5${cend}) or ${clc}all${cend} for everything"
+    printf '\n'
+    
+    # Display options with descriptions
+    for ((i=0; i<${#service_options[@]}; i++)); do
+        local desc_color="${cy}"
+        if [[ "${service_descriptions[$i]}" =~ "REQUIRED" ]] || [[ "${service_descriptions[$i]}" =~ "auto-added" ]]; then
+            desc_color="${uyc}"
+        fi
+        printf '%b\n' " ${clc}$((i+1)))${cend} ${clg}${service_options[$i]}${cend}"
+        printf '%b\n' "     ${desc_color}└─ ${service_descriptions[$i]}${cend}"
+    done
+    
+    printf '\n'
+    while true; do
+        printf '%b' " ${uyc} Select services ${clc}[1-${#service_options[@]}, all]:${cend} "
+        read -r input
+        
+        if [[ -z "$input" ]]; then
+            printf '\n%b\n' " ${ucross} Please make a selection"
+            continue
+        fi
+        
+        if [[ "$input" == "all" ]] || [[ "$input" == "ALL" ]]; then
+            # Select all services
+            local selected_services=("${service_map[@]}")
+            
+            # Handle dependencies (remove duplicates)
+            local final_services=()
+            for service in "${selected_services[@]}"; do
+                if [[ ! " ${final_services[@]} " =~ " ${service} " ]]; then
+                    final_services+=("$service")
+                fi
+            done
+            
+            # Store in global array
+            case "$stack_name" in
+                "servarr")
+                    services_servarr=("${final_services[@]}")
+                    ;;
+                "streamarr")
+                    services_streamarr=("${final_services[@]}")
+                    ;;
+                "creatarr")
+                    services_creatarr=("${final_services[@]}")
+                    ;;
+                "business")
+                    services_business=("${final_services[@]}")
+                    ;;
+                "infrastructure")
+                    services_infrastructure=("${final_services[@]}")
+                    ;;
+            esac
+            
+            printf '\n%b\n' " ${utick} ${clg}All services selected!${cend}"
+            printf '\n%b\n' " ${uyc} Selected: ${clc}${#final_services[@]}${cend} service(s)"
+            for service in "${final_services[@]}"; do
+                printf '%b\n' " ${clc}  ✓${cend} ${service}"
+            done
+            return 0
+        fi
+        
+        # Parse input
+        local valid=true
+        local temp_selected=()
+        for num in $input; do
+            if [[ "$num" =~ ^[0-9]+$ ]] && [[ $num -ge 1 ]] && [[ $num -le ${#service_options[@]} ]]; then
+                temp_selected+=("${service_map[$((num-1))]}")
+            else
+                valid=false
+                break
+            fi
+        done
+        
+        if [[ "$valid" == true ]] && [[ ${#temp_selected[@]} -gt 0 ]]; then
+            # Remove duplicates
+            local selected_services=()
+            for service in "${temp_selected[@]}"; do
+                if [[ ! " ${selected_services[@]} " =~ " ${service} " ]]; then
+                    selected_services+=("$service")
+                fi
+            done
+            
+            # Handle dependencies
+            if [[ " ${selected_services[@]} " =~ " n8n " ]] && [[ ! " ${selected_services[@]} " =~ " n8n-postgres " ]]; then
+                printf '\n%b\n' " ${uyc} ${clg}Auto-adding${cend} n8n-postgres (required dependency)"
+                selected_services+=("n8n-postgres")
+            fi
+            
+            if [[ " ${selected_services[@]} " =~ " mealie " ]] && [[ ! " ${selected_services[@]} " =~ " mealie-db " ]]; then
+                printf '\n%b\n' " ${uyc} ${clg}Auto-adding${cend} mealie-db (required dependency)"
+                selected_services+=("mealie-db")
+            fi
+            
+            if [[ " ${selected_services[@]} " =~ " qbittorrent " ]] && [[ ! " ${selected_services[@]} " =~ " gluetun " ]]; then
+                printf '\n%b\n' " ${uyc} ${clg}Auto-adding${cend} Gluetun (required for VPN-protected downloads)"
+                selected_services+=("gluetun")
+            fi
+            
+            if [[ " ${selected_services[@]} " =~ " sabnzbd " ]] && [[ ! " ${selected_services[@]} " =~ " gluetun " ]]; then
+                printf '\n%b\n' " ${uyc} ${clg}Auto-adding${cend} Gluetun (required for VPN-protected downloads)"
+                selected_services+=("gluetun")
+            fi
+            
+            # Store in global array
+            case "$stack_name" in
+                "servarr")
+                    services_servarr=("${selected_services[@]}")
+                    ;;
+                "streamarr")
+                    services_streamarr=("${selected_services[@]}")
+                    ;;
+                "creatarr")
+                    services_creatarr=("${selected_services[@]}")
+                    ;;
+                "business")
+                    services_business=("${selected_services[@]}")
+                    ;;
+                "infrastructure")
+                    services_infrastructure=("${selected_services[@]}")
+                    ;;
+            esac
+            
+            if [[ ${#selected_services[@]} -gt 0 ]]; then
+                printf '\n%b\n' " ${utick} Selected ${clc}${#selected_services[@]}${cend} service(s)"
+                for service in "${selected_services[@]}"; do
+                    printf '%b\n' " ${clc}  ✓${cend} ${service}"
+                done
+                return 0
+            else
+                printf '\n%b\n' " ${ucross} No valid services selected"
+            fi
+        else
+            printf '\n%b\n' " ${ucross} Invalid selection. Please enter numbers between ${clc}1-${#service_options[@]}${cend} or ${clc}all${cend}"
+        fi
+    done
+}
+
+#################################################################################################################################################
+# Docker Compose File Filtering
+#################################################################################################################################################
+create_filtered_compose_file() {
+    local stack_name="$1"
+    local compose_file="docker-compose-${stack_name}.yml"
+    local filtered_file="docker-compose-${stack_name}-filtered.yml"
+    local services_var="services_${stack_name}[@]"
+    local selected_services=("${!services_var}")
+    
+    if [[ ! -f "$compose_file" ]]; then
+        printf '\n%b\n' " ${ucross} Compose file not found: ${clc}${compose_file}${cend}"
+        return 1
+    fi
+    
+    # Read the original compose file
+    local in_service=false
+    local current_service=""
+    local service_content=""
+    local output_lines=()
+    local line_num=0
+    
+    # Read file line by line
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        ((line_num++))
+        
+        # Check if line starts a service definition
+        if [[ "$line" =~ ^[[:space:]]*([a-zA-Z0-9_-]+):[[:space:]]*$ ]] && [[ ! "$line" =~ ^[[:space:]]*(version|services|networks|volumes): ]]; then
+            # If we were in a service, check if it should be included
+            if [[ "$in_service" == true ]] && [[ -n "$current_service" ]]; then
+                # Check if this service is selected
+                local include_service=false
+                for selected in "${selected_services[@]}"; do
+                    if [[ "$current_service" == "$selected" ]]; then
+                        include_service=true
+                        break
+                    fi
+                done
+                
+                if [[ "$include_service" == true ]]; then
+                    # Add the service content
+                    output_lines+=("$service_content")
+                fi
+            fi
+            
+            # Start new service
+            current_service="${BASH_REMATCH[1]}"
+            in_service=true
+            service_content="$line"$'\n'
+        elif [[ "$in_service" == true ]]; then
+            # Continue building service content
+            service_content+="$line"$'\n'
+            
+            # Check if we've reached the end of the service (next service or end of services section)
+            if [[ "$line" =~ ^[[:space:]]*[a-zA-Z0-9_-]+:[[:space:]]*$ ]] && [[ ! "$line" =~ ^[[:space:]]+ ]]; then
+                # This might be the start of a new top-level section
+                if [[ ! "$line" =~ ^[[:space:]]*(networks|volumes): ]]; then
+                    # It's a new service, process the previous one
+                    local include_service=false
+                    for selected in "${selected_services[@]}"; do
+                        if [[ "$current_service" == "$selected" ]]; then
+                            include_service=true
+                            break
+                        fi
+                    done
+                    
+                    if [[ "$include_service" == true ]]; then
+                        output_lines+=("$service_content")
+                    fi
+                    
+                    current_service="${BASH_REMATCH[1]}"
+                    service_content="$line"$'\n'
+                fi
+            fi
+        else
+            # Not in a service section, copy header/network/volume definitions
+            if [[ "$line" =~ ^(version|networks|volumes): ]] || [[ "$line_num" -lt 50 ]]; then
+                output_lines+=("$line")
+            fi
+        fi
+    done < "$compose_file"
+    
+    # Handle last service
+    if [[ "$in_service" == true ]] && [[ -n "$current_service" ]]; then
+        local include_service=false
+        for selected in "${selected_services[@]}"; do
+            if [[ "$current_service" == "$selected" ]]; then
+                include_service=true
+                break
+            fi
+        done
+        
+        if [[ "$include_service" == true ]]; then
+            output_lines+=("$service_content")
+        fi
+    fi
+    
+    # Write filtered file
+    printf '%s\n' "${output_lines[@]}" > "$filtered_file"
+    
+    printf '\n%b\n' " ${utick} Created filtered compose file: ${clc}${filtered_file}${cend}"
+    return 0
+}
+
+# Simpler approach: Use docker-compose with service selection
+deploy_selected_services() {
+    local stack_name="$1"
+    local compose_file="docker-compose-${stack_name}.yml"
+    local env_file=".env-${stack_name}"
+    local services_var="services_${stack_name}[@]"
+    local selected_services=("${!services_var}")
+    
+    if [[ ${#selected_services[@]} -eq 0 ]]; then
+        printf '\n%b\n' " ${uyc} No services selected for ${stack_name}, skipping"
+        return 0
+    fi
+    
+    # Build service list for docker-compose
+    local service_list=""
+    for service in "${selected_services[@]}"; do
+        service_list+="$service "
+    done
+    
+    # Deploy only selected services
+    if $compose_cmd --env-file "$env_file" -f "$compose_file" up -d ${service_list}; then
+        return 0
+    else
+        return 1
+    fi
 }
 
 #################################################################################################################################################
@@ -1046,7 +1761,7 @@ configure_environment_files() {
     show_loading_message "Configuring application settings" 1
     
     # Configure servarr environment
-    if [[ ! -f ".env-servarr" ]]; then
+    if [[ " ${stacks_to_install[@]} " =~ " servarr " ]] && [[ ! -f ".env-servarr" ]]; then
         if [[ -f ".env-servarr.example" ]]; then
             cp ".env-servarr.example" ".env-servarr"
             
@@ -1072,7 +1787,7 @@ configure_environment_files() {
     fi
     
     # Configure streamarr environment
-    if [[ ! -f ".env-streamarr" ]]; then
+    if [[ " ${stacks_to_install[@]} " =~ " streamarr " ]] && [[ ! -f ".env-streamarr" ]]; then
         if [[ -f ".env-streamarr.example" ]]; then
             cp ".env-streamarr.example" ".env-streamarr"
             
@@ -1099,7 +1814,7 @@ configure_environment_files() {
     fi
     
     # Configure creatarr environment
-    if [[ ! -f ".env-creatarr" ]]; then
+    if [[ " ${stacks_to_install[@]} " =~ " creatarr " ]] && [[ ! -f ".env-creatarr" ]]; then
         if [[ -f ".env-creatarr.example" ]]; then
             cp ".env-creatarr.example" ".env-creatarr"
             
@@ -1116,12 +1831,6 @@ configure_environment_files() {
             sed -i.bak "s|PGID=1000|PGID=${pgid}|g" ".env-creatarr"
             sed -i.bak "s|TZ=Etc/UTC|TZ=${timezone}|g" ".env-creatarr"
             
-            # Set n8n encryption key if provided
-            if [[ -n "$n8n_encryption_key" ]]; then
-                sed -i.bak "s|N8N_ENCRYPTION_KEY=.*|N8N_ENCRYPTION_KEY=${n8n_encryption_key}|g" ".env-creatarr"
-                printf '\n%b\n' " ${utick} Set n8n encryption key in .env-creatarr"
-            fi
-            
             printf '\n%b\n' " ${utick} Created .env-creatarr with ${platform} settings"
         else
             printf '\n%b\n' " ${ucross} Warning: .env-creatarr.example not found"
@@ -1130,8 +1839,66 @@ configure_environment_files() {
         printf '\n%b\n' " ${uyc} .env-creatarr already exists, skipping"
     fi
     
+    # Configure business environment
+    if [[ " ${stacks_to_install[@]} " =~ " business " ]] && [[ ! -f ".env-business" ]]; then
+        if [[ -f ".env-business.example" ]]; then
+            cp ".env-business.example" ".env-business"
+            
+            # Update paths based on platform
+            if [[ "$platform" == "windows" ]]; then
+                # Convert Windows path to Unix-style for Docker
+                unix_path="${base_path//\\//}"
+                sed -i.bak "s|/volume1|${unix_path}|g" ".env-business"
+            else
+                sed -i.bak "s|/volume1|${base_path}|g" ".env-business"
+            fi
+            
+            sed -i.bak "s|PUID=1000|PUID=${puid}|g" ".env-business"
+            sed -i.bak "s|PGID=1000|PGID=${pgid}|g" ".env-business"
+            sed -i.bak "s|TZ=America/New_York|TZ=${timezone}|g" ".env-business"
+            
+            # Set n8n encryption key if provided
+            if [[ -n "$n8n_encryption_key" ]]; then
+                sed -i.bak "s|N8N_ENCRYPTION_KEY=.*|N8N_ENCRYPTION_KEY=${n8n_encryption_key}|g" ".env-business"
+                printf '\n%b\n' " ${utick} Set n8n encryption key in .env-business"
+            fi
+            
+            printf '\n%b\n' " ${utick} Created .env-business with ${platform} settings"
+        else
+            printf '\n%b\n' " ${ucross} Warning: .env-business.example not found"
+        fi
+    else
+        printf '\n%b\n' " ${uyc} .env-business already exists, skipping"
+    fi
+    
+    # Configure infrastructure environment
+    if [[ " ${stacks_to_install[@]} " =~ " infrastructure " ]] && [[ ! -f ".env-infrastructure" ]]; then
+        if [[ -f ".env-infrastructure.example" ]]; then
+            cp ".env-infrastructure.example" ".env-infrastructure"
+            
+            # Update paths based on platform
+            if [[ "$platform" == "windows" ]]; then
+                # Convert Windows path to Unix-style for Docker
+                unix_path="${base_path//\\//}"
+                sed -i.bak "s|/volume1|${unix_path}|g" ".env-infrastructure"
+            else
+                sed -i.bak "s|/volume1|${base_path}|g" ".env-infrastructure"
+            fi
+            
+            sed -i.bak "s|PUID=1000|PUID=${puid}|g" ".env-infrastructure"
+            sed -i.bak "s|PGID=1000|PGID=${pgid}|g" ".env-infrastructure"
+            sed -i.bak "s|TZ=America/New_York|TZ=${timezone}|g" ".env-infrastructure"
+            
+            printf '\n%b\n' " ${utick} Created .env-infrastructure with ${platform} settings"
+        else
+            printf '\n%b\n' " ${ucross} Warning: .env-infrastructure.example not found"
+        fi
+    else
+        printf '\n%b\n' " ${uyc} .env-infrastructure already exists, skipping"
+    fi
+    
     # Clean up backup files
-    rm -f ".env-servarr.bak" ".env-streamarr.bak" ".env-creatarr.bak" 2>/dev/null || true
+    rm -f ".env-servarr.bak" ".env-streamarr.bak" ".env-creatarr.bak" ".env-business.bak" ".env-infrastructure.bak" 2>/dev/null || true
     
     printf '\n%b\n' " ${utick} Environment files configured!"
 }
@@ -1161,78 +1928,149 @@ fix_permissions() {
 }
 
 deploy_stacks() {
-    printf '\n%b\n' " ${uyc} Deploying homelab media stack..."
+    printf '\n%b\n' " ${uyc} Deploying selected homelab media stack components..."
     show_loading_message "Preparing container deployment" 1
     
     # Deploy SERVARR stack (download & management)
-    printf '\n%b\n' "${clg}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
-    printf '\n%b\n' "${clg}║                                                                               ║${cend}"
-    printf '\n%b\n' "${clg}║                    DEPLOYING SERVARR STACK                                    ║${cend}"
-    printf '\n%b\n' "${clg}║                                                                               ║${cend}"
-    printf '\n%b\n' "${clg}║                    (Download & Management Services)                           ║${cend}"
-    printf '\n%b\n' "${clg}║                                                                               ║${cend}"
-    printf '\n%b\n' "${clg}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
-    
-    show_loading_message "Launching SERVARR services (VPN, downloads, automation)" 3
-    
-    if $compose_cmd --env-file .env-servarr -f docker-compose-servarr.yml up -d; then
-        printf '\n%b\n' " ${utick} SERVARR stack deployed successfully!"
-        printf '\n%b\n' " ${uyc} Services: Gluetun (VPN), qBittorrent, SABnzbd, Prowlarr, Sonarr, Radarr, Lidarr, Bazarr, FileBot, Homarr, Uptime Kuma"
-    else
-        printf '\n%b\n' " ${ucross} Failed to deploy SERVARR stack"
-        return 1
-    fi
-    
-    # Wait for VPN to be ready
-    printf '\n%b\n' " ${uyc} Waiting for VPN connection to establish (30 seconds)..."
-    show_loading_message "Establishing VPN connection" 3
-    
-    # Verify VPN (optional, don't fail if it doesn't work)
-    if docker exec gluetun curl -s --max-time 10 ifconfig.me > /dev/null 2>&1; then
-        vpn_ip=$(docker exec gluetun curl -s --max-time 10 ifconfig.me 2>/dev/null)
-        printf '\n%b\n' " ${utick} VPN is working! External IP: ${clc}${vpn_ip}${cend}"
-    else
-        printf '\n%b\n' " ${uyc} VPN not yet ready (this is normal, configure it later)"
+    if [[ " ${stacks_to_install[@]} " =~ " servarr " ]]; then
+        printf '\n%b\n' "${clg}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+        printf '\n%b\n' "${clg}║                                                                               ║${cend}"
+        printf '\n%b\n' "${clg}║                    DEPLOYING SERVARR STACK                                    ║${cend}"
+        printf '\n%b\n' "${clg}║                                                                               ║${cend}"
+        printf '\n%b\n' "${clg}║                    (Download & Management Services)                           ║${cend}"
+        printf '\n%b\n' "${clg}║                                                                               ║${cend}"
+        printf '\n%b\n' "${clg}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+        
+        show_loading_message "Launching SERVARR services" 3
+        
+        # Deploy selected services (or all if none selected)
+        if [[ ${#services_servarr[@]} -gt 0 ]]; then
+            if $compose_cmd --env-file .env-servarr -f docker-compose-servarr.yml up -d "${services_servarr[@]}"; then
+                printf '\n%b\n' " ${utick} SERVARR stack deployed successfully!"
+            else
+                printf '\n%b\n' " ${ucross} Failed to deploy SERVARR stack"
+                return 1
+            fi
+        else
+            printf '\n%b\n' " ${uyc} No services selected for SERVARR stack"
+        fi
+        
+        # Wait for VPN to be ready if Gluetun is selected
+        if [[ " ${services_servarr[@]} " =~ " gluetun " ]]; then
+                printf '\n%b\n' " ${uyc} Waiting for VPN connection to establish (30 seconds)..."
+                show_loading_message "Establishing VPN connection" 3
+                
+                # Verify VPN (optional, don't fail if it doesn't work)
+                if docker exec gluetun curl -s --max-time 10 ifconfig.me > /dev/null 2>&1; then
+                    vpn_ip=$(docker exec gluetun curl -s --max-time 10 ifconfig.me 2>/dev/null)
+                    printf '\n%b\n' " ${utick} VPN is working! External IP: ${clc}${vpn_ip}${cend}"
+                else
+                    printf '\n%b\n' " ${uyc} VPN not yet ready (this is normal, configure it later)"
+                fi
+            fi
     fi
     
     # Deploy STREAMARR stack (streaming & requests)
-    printf '\n%b\n' "${clb}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
-    printf '\n%b\n' "${clb}║                                                                               ║${cend}"
-    printf '\n%b\n' "${clb}║                    DEPLOYING STREAMARR STACK                                  ║${cend}"
-    printf '\n%b\n' "${clb}║                                                                               ║${cend}"
-    printf '\n%b\n' "${clb}║                    (Streaming & Request Services)                             ║${cend}"
-    printf '\n%b\n' "${clb}║                                                                               ║${cend}"
-    printf '\n%b\n' "${clb}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
-    
-    show_loading_message "Launching STREAMARR services (Plex, Overseerr, Tautulli, ErsatzTV)" 3
-    
-    if $compose_cmd --env-file .env-streamarr -f docker-compose-streamarr.yml up -d; then
-        printf '\n%b\n' " ${utick} STREAMARR stack deployed successfully!"
-        printf '\n%b\n' " ${uyc} Services: Plex Media Server, Overseerr, Tautulli, ErsatzTV, Navidrome"
-    else
-        printf '\n%b\n' " ${ucross} Failed to deploy STREAMARR stack"
-        return 1
+    if [[ " ${stacks_to_install[@]} " =~ " streamarr " ]]; then
+        printf '\n%b\n' "${clb}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+        printf '\n%b\n' "${clb}║                                                                               ║${cend}"
+        printf '\n%b\n' "${clb}║                    DEPLOYING STREAMARR STACK                                  ║${cend}"
+        printf '\n%b\n' "${clb}║                                                                               ║${cend}"
+        printf '\n%b\n' "${clb}║                    (Streaming & Request Services)                             ║${cend}"
+        printf '\n%b\n' "${clb}║                                                                               ║${cend}"
+        printf '\n%b\n' "${clb}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+        
+        show_loading_message "Launching STREAMARR services" 3
+        
+        # Deploy selected services
+        if [[ ${#services_streamarr[@]} -gt 0 ]]; then
+            if $compose_cmd --env-file .env-streamarr -f docker-compose-streamarr.yml up -d "${services_streamarr[@]}"; then
+                printf '\n%b\n' " ${utick} STREAMARR stack deployed successfully!"
+            else
+                printf '\n%b\n' " ${ucross} Failed to deploy STREAMARR stack"
+                return 1
+            fi
+        else
+            printf '\n%b\n' " ${uyc} No services selected for STREAMARR stack"
+        fi
     fi
     
-    # Deploy CREATARR stack (creative content & family life)
-    printf '\n%b\n' "${clm}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
-    printf '\n%b\n' "${clm}║                                                                               ║${cend}"
-    printf '\n%b\n' "${clm}║                    DEPLOYING CREATARR STACK                                   ║${cend}"
-    printf '\n%b\n' "${clm}║                                                                               ║${cend}"
-    printf '\n%b\n' "${clm}║                    (Creative Content & Family Life)                          ║${cend}"
-    printf '\n%b\n' "${clm}║                                                                               ║${cend}"
-    printf '\n%b\n' "${clm}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
-    
-    show_loading_message "Launching CREATARR services (n8n, Mealie, Noisedash, Swing Music, RetroArch, Komga, Audiobookshelf, Calibre-Web)" 3
-    
-    if $compose_cmd --env-file .env-creatarr -f docker-compose-creatarr.yml up -d; then
-        printf '\n%b\n' " ${utick} CREATARR stack deployed successfully!"
-        printf '\n%b\n' " ${uyc} Services: n8n, Mealie, Noisedash, Swing Music, RetroArch, Komga, Audiobookshelf, Calibre-Web"
-        return 0
-    else
-        printf '\n%b\n' " ${ucross} Failed to deploy CREATARR stack"
-        return 1
+    # Deploy CREATARR stack (creative & entertainment)
+    if [[ " ${stacks_to_install[@]} " =~ " creatarr " ]]; then
+        printf '\n%b\n' "${clm}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+        printf '\n%b\n' "${clm}║                                                                               ║${cend}"
+        printf '\n%b\n' "${clm}║                    DEPLOYING CREATARR STACK                                   ║${cend}"
+        printf '\n%b\n' "${clm}║                                                                               ║${cend}"
+        printf '\n%b\n' "${clm}║                    (Creative & Entertainment Services)                        ║${cend}"
+        printf '\n%b\n' "${clm}║                                                                               ║${cend}"
+        printf '\n%b\n' "${clm}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+        
+        show_loading_message "Launching CREATARR services" 3
+        
+        # Deploy selected services
+        if [[ ${#services_creatarr[@]} -gt 0 ]]; then
+            if $compose_cmd --env-file .env-creatarr -f docker-compose-creatarr.yml up -d "${services_creatarr[@]}"; then
+                printf '\n%b\n' " ${utick} CREATARR stack deployed successfully!"
+            else
+                printf '\n%b\n' " ${ucross} Failed to deploy CREATARR stack"
+                return 1
+            fi
+        else
+            printf '\n%b\n' " ${uyc} No services selected for CREATARR stack"
+        fi
     fi
+    
+    # Deploy BUSINESS stack (business & productivity)
+    if [[ " ${stacks_to_install[@]} " =~ " business " ]]; then
+        printf '\n%b\n' "${cc}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+        printf '\n%b\n' "${cc}║                                                                               ║${cend}"
+        printf '\n%b\n' "${cc}║                    DEPLOYING BUSINESS STACK                                   ║${cend}"
+        printf '\n%b\n' "${cc}║                                                                               ║${cend}"
+        printf '\n%b\n' "${cc}║                    (Business & Productivity Services)                          ║${cend}"
+        printf '\n%b\n' "${cc}║                                                                               ║${cend}"
+        printf '\n%b\n' "${cc}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+        
+        show_loading_message "Launching BUSINESS services" 3
+        
+        # Deploy selected services
+        if [[ ${#services_business[@]} -gt 0 ]]; then
+            if $compose_cmd --env-file .env-business -f docker-compose-business.yml up -d "${services_business[@]}"; then
+                printf '\n%b\n' " ${utick} BUSINESS stack deployed successfully!"
+            else
+                printf '\n%b\n' " ${ucross} Failed to deploy BUSINESS stack"
+                return 1
+            fi
+        else
+            printf '\n%b\n' " ${uyc} No services selected for BUSINESS stack"
+        fi
+    fi
+    
+    # Deploy INFRASTRUCTURE stack (system management)
+    if [[ " ${stacks_to_install[@]} " =~ " infrastructure " ]]; then
+        printf '\n%b\n' "${cy}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+        printf '\n%b\n' "${cy}║                                                                               ║${cend}"
+        printf '\n%b\n' "${cy}║                    DEPLOYING INFRASTRUCTURE STACK                             ║${cend}"
+        printf '\n%b\n' "${cy}║                                                                               ║${cend}"
+        printf '\n%b\n' "${cy}║                    (System Management & Monitoring)                           ║${cend}"
+        printf '\n%b\n' "${cy}║                                                                               ║${cend}"
+        printf '\n%b\n' "${cy}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+        
+        show_loading_message "Launching INFRASTRUCTURE services" 3
+        
+        # Deploy selected services
+        if [[ ${#services_infrastructure[@]} -gt 0 ]]; then
+            if $compose_cmd --env-file .env-infrastructure -f docker-compose-infrastructure.yml up -d "${services_infrastructure[@]}"; then
+                printf '\n%b\n' " ${utick} INFRASTRUCTURE stack deployed successfully!"
+            else
+                printf '\n%b\n' " ${ucross} Failed to deploy INFRASTRUCTURE stack"
+                return 1
+            fi
+        else
+            printf '\n%b\n' " ${uyc} No services selected for INFRASTRUCTURE stack"
+        fi
+    fi
+    
+    return 0
 }
 
 show_access_info() {
@@ -1245,50 +2083,132 @@ show_access_info() {
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
     
-    printf '\n%b\n' "${clg}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
-    printf '\n%b\n' "${clg}║                                                                               ║${cend}"
-    printf '\n%b\n' "${clg}║                    SERVARR STACK (Download & Management)                      ║${cend}"
-    printf '\n%b\n' "${clg}║                                                                               ║${cend}"
-    printf '\n%b\n' "${clg}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+    # SERVARR Stack
+    if [[ " ${stacks_to_install[@]} " =~ " servarr " ]]; then
+        printf '\n%b\n' "${clg}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+        printf '\n%b\n' "${clg}║                                                                               ║${cend}"
+        printf '\n%b\n' "${clg}║                    SERVARR STACK (Download & Management)                      ║${cend}"
+        printf '\n%b\n' "${clg}║                                                                               ║${cend}"
+        printf '\n%b\n' "${clg}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+        
+        if [[ " ${services_servarr[@]} " =~ " qbittorrent " ]]; then
+            printf '\n%b\n' " ${clc}qBittorrent:${cend} http://${local_ip}:8080"
+        fi
+        if [[ " ${services_servarr[@]} " =~ " sabnzbd " ]]; then
+            printf '\n%b\n' " ${clc}SABnzbd:${cend} http://${local_ip}:8090"
+        fi
+        if [[ " ${services_servarr[@]} " =~ " prowlarr " ]]; then
+            printf '\n%b\n' " ${clc}Prowlarr:${cend} http://${local_ip}:9696"
+        fi
+        if [[ " ${services_servarr[@]} " =~ " sonarr " ]]; then
+            printf '\n%b\n' " ${clc}Sonarr:${cend} http://${local_ip}:8989"
+        fi
+        if [[ " ${services_servarr[@]} " =~ " radarr " ]]; then
+            printf '\n%b\n' " ${clc}Radarr:${cend} http://${local_ip}:7878"
+        fi
+        if [[ " ${services_servarr[@]} " =~ " lidarr " ]]; then
+            printf '\n%b\n' " ${clc}Lidarr:${cend} http://${local_ip}:8686"
+        fi
+        if [[ " ${services_servarr[@]} " =~ " bazarr " ]]; then
+            printf '\n%b\n' " ${clc}Bazarr:${cend} http://${local_ip}:6767"
+        fi
+        if [[ " ${services_servarr[@]} " =~ " filebot-node " ]]; then
+            printf '\n%b\n' " ${clc}FileBot:${cend} http://${local_ip}:5452"
+        fi
+    fi
     
-    printf '\n%b\n' " ${clc}Homarr Dashboard:${cend} http://${local_ip}:7575"
-    printf '\n%b\n' " ${clc}qBittorrent:${cend} http://${local_ip}:8080"
-    printf '\n%b\n' " ${clc}SABnzbd:${cend} http://${local_ip}:8090"
-    printf '\n%b\n' " ${clc}Prowlarr:${cend} http://${local_ip}:9696"
-    printf '\n%b\n' " ${clc}Sonarr:${cend} http://${local_ip}:8989"
-    printf '\n%b\n' " ${clc}Radarr:${cend} http://${local_ip}:7878"
-    printf '\n%b\n' " ${clc}Lidarr:${cend} http://${local_ip}:8686"
-    printf '\n%b\n' " ${clc}Bazarr:${cend} http://${local_ip}:6767"
-    printf '\n%b\n' " ${clc}FileBot:${cend} http://${local_ip}:5452"
-    printf '\n%b\n' " ${clc}Portainer:${cend} http://${local_ip}:9000"
-    printf '\n%b\n' " ${clc}Uptime Kuma:${cend} http://${local_ip}:3001"
+    # STREAMARR Stack
+    if [[ " ${stacks_to_install[@]} " =~ " streamarr " ]]; then
+        printf '\n%b\n' "${clb}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+        printf '\n%b\n' "${clb}║                                                                               ║${cend}"
+        printf '\n%b\n' "${clb}║                    STREAMARR STACK (Streaming & Requests)                     ║${cend}"
+        printf '\n%b\n' "${clb}║                                                                               ║${cend}"
+        printf '\n%b\n' "${clb}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+        
+        if [[ " ${services_streamarr[@]} " =~ " plex " ]]; then
+            printf '\n%b\n' " ${clc}Plex Media Server:${cend} http://${local_ip}:32400/web"
+        fi
+        if [[ " ${services_streamarr[@]} " =~ " overseerr " ]]; then
+            printf '\n%b\n' " ${clc}Overseerr:${cend} http://${local_ip}:5055"
+        fi
+        if [[ " ${services_streamarr[@]} " =~ " tautulli " ]]; then
+            printf '\n%b\n' " ${clc}Tautulli:${cend} http://${local_ip}:8181"
+        fi
+        if [[ " ${services_streamarr[@]} " =~ " ersatztv " ]]; then
+            printf '\n%b\n' " ${clc}ErsatzTV:${cend} http://${local_ip}:8409"
+        fi
+        if [[ " ${services_streamarr[@]} " =~ " navidrome " ]]; then
+            printf '\n%b\n' " ${clc}Navidrome:${cend} http://${local_ip}:4533"
+        fi
+    fi
     
-    printf '\n%b\n' "${clb}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
-    printf '\n%b\n' "${clb}║                                                                               ║${cend}"
-    printf '\n%b\n' "${clb}║                    STREAMARR STACK (Streaming & Requests)                     ║${cend}"
-    printf '\n%b\n' "${clb}║                                                                               ║${cend}"
-    printf '\n%b\n' "${clb}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+    # CREATARR Stack
+    if [[ " ${stacks_to_install[@]} " =~ " creatarr " ]]; then
+        printf '\n%b\n' "${clm}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+        printf '\n%b\n' "${clm}║                                                                               ║${cend}"
+        printf '\n%b\n' "${clm}║                    CREATARR STACK (Creative & Entertainment)                  ║${cend}"
+        printf '\n%b\n' "${clm}║                                                                               ║${cend}"
+        printf '\n%b\n' "${clm}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+        
+        if [[ " ${services_creatarr[@]} " =~ " retroarch " ]]; then
+            printf '\n%b\n' " ${clc}RetroArch Gaming:${cend} http://${local_ip}:8081"
+        fi
+        if [[ " ${services_creatarr[@]} " =~ " komga " ]]; then
+            printf '\n%b\n' " ${clc}Komga Comics:${cend} http://${local_ip}:25600"
+        fi
+        if [[ " ${services_creatarr[@]} " =~ " audiobookshelf " ]]; then
+            printf '\n%b\n' " ${clc}Audiobookshelf:${cend} http://${local_ip}:13378"
+        fi
+        if [[ " ${services_creatarr[@]} " =~ " calibre-web " ]]; then
+            printf '\n%b\n' " ${clc}Calibre-Web:${cend} http://${local_ip}:8083"
+        fi
+        if [[ " ${services_creatarr[@]} " =~ " noisedash " ]]; then
+            printf '\n%b\n' " ${clc}Noisedash:${cend} http://${local_ip}:3002"
+        fi
+        if [[ " ${services_creatarr[@]} " =~ " swing-music " ]]; then
+            printf '\n%b\n' " ${clc}Swing Music:${cend} http://${local_ip}:1970"
+        fi
+    fi
     
-    printf '\n%b\n' " ${clc}Plex Media Server:${cend} http://${local_ip}:32400/web"
-    printf '\n%b\n' " ${clc}Overseerr:${cend} http://${local_ip}:5055"
-    printf '\n%b\n' " ${clc}Tautulli:${cend} http://${local_ip}:8181"
-    printf '\n%b\n' " ${clc}ErsatzTV:${cend} http://${local_ip}:8409"
-    printf '\n%b\n' " ${clc}Navidrome:${cend} http://${local_ip}:4533"
+    # BUSINESS Stack
+    if [[ " ${stacks_to_install[@]} " =~ " business " ]]; then
+        printf '\n%b\n' "${cc}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+        printf '\n%b\n' "${cc}║                                                                               ║${cend}"
+        printf '\n%b\n' "${cc}║                    BUSINESS STACK (Business & Productivity)                   ║${cend}"
+        printf '\n%b\n' "${cc}║                                                                               ║${cend}"
+        printf '\n%b\n' "${cc}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+        
+        if [[ " ${services_business[@]} " =~ " n8n " ]]; then
+            printf '\n%b\n' " ${clc}n8n Workflows:${cend} http://${local_ip}:5678"
+        fi
+        if [[ " ${services_business[@]} " =~ " mealie " ]]; then
+            printf '\n%b\n' " ${clc}Mealie Recipes:${cend} http://${local_ip}:9001"
+        fi
+    fi
     
-    printf '\n%b\n' "${clm}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
-    printf '\n%b\n' "${clm}║                                                                               ║${cend}"
-    printf '\n%b\n' "${clm}║                    CREATARR STACK (Creative Content & Family Life)           ║${cend}"
-    printf '\n%b\n' "${clm}║                                                                               ║${cend}"
-    printf '\n%b\n' "${clm}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
-    
-    printf '\n%b\n' " ${clc}n8n Workflows:${cend} http://${local_ip}:5678"
-    printf '\n%b\n' " ${clc}Mealie Recipes:${cend} http://${local_ip}:9001"
-    printf '\n%b\n' " ${clc}Noisedash:${cend} http://${local_ip}:3002"
-    printf '\n%b\n' " ${clc}Swing Music:${cend} http://${local_ip}:1970"
-    printf '\n%b\n' " ${clc}RetroArch Gaming:${cend} http://${local_ip}:8081"
-    printf '\n%b\n' " ${clc}Komga Comics:${cend} http://${local_ip}:25600"
-    printf '\n%b\n' " ${clc}Audiobookshelf:${cend} http://${local_ip}:13378"
-    printf '\n%b\n' " ${clc}Calibre-Web:${cend} http://${local_ip}:8083"
+    # INFRASTRUCTURE Stack
+    if [[ " ${stacks_to_install[@]} " =~ " infrastructure " ]]; then
+        printf '\n%b\n' "${cy}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+        printf '\n%b\n' "${cy}║                                                                               ║${cend}"
+        printf '\n%b\n' "${cy}║                    INFRASTRUCTURE STACK (System Management)                   ║${cend}"
+        printf '\n%b\n' "${cy}║                                                                               ║${cend}"
+        printf '\n%b\n' "${cy}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+        
+        if [[ " ${services_infrastructure[@]} " =~ " homarr " ]]; then
+            printf '\n%b\n' " ${clc}Homarr Dashboard:${cend} http://${local_ip}:7575"
+        fi
+        if [[ " ${services_infrastructure[@]} " =~ " uptime-kuma " ]]; then
+            printf '\n%b\n' " ${clc}Uptime Kuma:${cend} http://${local_ip}:3001"
+        fi
+        # Show Portainer URL if installed
+        if [[ "${PORTAINER_INSTALLED:-false}" == "true" ]] && [[ -n "${PORTAINER_PORT:-9000}" ]]; then
+            printf '\n%b\n' " ${clc}Portainer:${cend} http://${local_ip}:${PORTAINER_PORT:-9000}"
+        elif [[ "${PORTAINER_INSTALLED:-false}" == "true" ]]; then
+            printf '\n%b\n' " ${clc}Portainer:${cend} http://${local_ip}:9000 (check actual port if different)"
+        else
+            printf '\n%b\n' " ${uyc}Portainer:${cend} Not detected (install separately if needed)"
+        fi
+    fi
     
     printf '\n%b\n' " ${uyc} ${cy}Next Steps:${cend}"
     printf '\n%b\n' " ${clc}1.${cend} Set up download clients in Sonarr/Radarr"
@@ -1392,12 +2312,23 @@ cleanup_failed_installation() {
             $compose_cmd --env-file .env-creatarr -f docker-compose-creatarr.yml down --remove-orphans 2>/dev/null || true
         fi
         
+        # Stop business stack if it exists
+        if [[ -f "docker-compose-business.yml" ]] && [[ -f ".env-business" ]]; then
+            $compose_cmd --env-file .env-business -f docker-compose-business.yml down --remove-orphans 2>/dev/null || true
+        fi
+        
+        # Stop infrastructure stack if it exists
+        if [[ -f "docker-compose-infrastructure.yml" ]] && [[ -f ".env-infrastructure" ]]; then
+            $compose_cmd --env-file .env-infrastructure -f docker-compose-infrastructure.yml down --remove-orphans 2>/dev/null || true
+        fi
+        
         # Remove any related containers
         local related_containers=(
             "gluetun" "qbittorrent" "sabnzbd" "sonarr" "radarr" "lidarr" "bazarr" "prowlarr"
-            "plex" "tautulli" "overseerr" "homarr" "ersatztv" "filebot" "navidrome"
+            "plex" "tautulli" "overseerr" "homarr" "ersatztv" "filebot-node" "filebot-watcher" "navidrome"
             "n8n" "n8n-postgres" "mealie" "mealie-db" "noisedash" "swing-music" "retroarch"
-            "komga" "audiobookshelf" "calibre-web"
+            "komga" "audiobookshelf" "calibre-web" "uptime-kuma"
+            "watchtower-infrastructure"
         )
         
         for container in "${related_containers[@]}"; do
@@ -1408,12 +2339,14 @@ cleanup_failed_installation() {
         docker network rm servarr-network 2>/dev/null || true
         docker network rm streamarr-network 2>/dev/null || true
         docker network rm creatarr-network 2>/dev/null || true
+        docker network rm business-network 2>/dev/null || true
+        docker network rm infrastructure-network 2>/dev/null || true
     fi
     
     # Remove generated environment files
     printf '\n%b\n' " ${uyc} Removing generated configuration files..."
-    rm -f ".env-servarr" ".env-streamarr" ".env-creatarr" 2>/dev/null || true
-    rm -f ".env-servarr.bak" ".env-streamarr.bak" ".env-creatarr.bak" 2>/dev/null || true
+    rm -f ".env-servarr" ".env-streamarr" ".env-creatarr" ".env-business" ".env-infrastructure" 2>/dev/null || true
+    rm -f ".env-servarr.bak" ".env-streamarr.bak" ".env-creatarr.bak" ".env-business.bak" ".env-infrastructure.bak" 2>/dev/null || true
     
     # Remove directories if they were created and are empty
     if [[ -n "$base_path" ]] && [[ -d "$base_path" ]]; then
@@ -1424,6 +2357,8 @@ cleanup_failed_installation() {
             "${base_path}/docker/servarr"
             "${base_path}/docker/streamarr"
             "${base_path}/docker/creatarr"
+            "${base_path}/docker/business"
+            "${base_path}/docker/infrastructure"
             "${base_path}/data/downloads/complete"
             "${base_path}/data/downloads/incomplete"
             "${base_path}/data/media/movies"
@@ -1480,7 +2415,7 @@ cleanup_failed_installation() {
     
     printf '\n%b\n' " ${uyc} ${cy}What was cleaned up:${cend}"
     printf '\n%b\n' " ${clc}•${cend} All Docker containers and networks"
-    printf '\n%b\n' " ${clc}•${cend} Generated environment files (.env-servarr, .env-streamarr, .env-creatarr)"
+    printf '\n%b\n' " ${clc}•${cend} Generated environment files (.env-servarr, .env-streamarr, .env-creatarr, .env-business, .env-infrastructure)"
     printf '\n%b\n' " ${clc}•${cend} Empty directories created during setup"
     
     printf '\n%b\n' " ${uyc} ${cy}What was preserved:${cend}"
@@ -1559,6 +2494,111 @@ main() {
         exit 1
     fi
     
+    # Select stacks to install
+    if ! select_stacks; then
+        printf '\n%b\n' " ${ucross} Stack selection cancelled or failed"
+        exit 1
+    fi
+    
+    if [[ ${#stacks_to_install[@]} -eq 0 ]]; then
+        printf '\n%b\n' " ${ucross} No stacks selected. Exiting."
+        exit 1
+    fi
+    
+    # Select services for each selected stack
+    for stack in "${stacks_to_install[@]}"; do
+        case "$stack" in
+            "servarr")
+                select_services "servarr" "SERVARR"
+                ;;
+            "streamarr")
+                select_services "streamarr" "STREAMARR"
+                ;;
+            "creatarr")
+                select_services "creatarr" "CREATARR"
+                ;;
+            "business")
+                select_services "business" "BUSINESS"
+                ;;
+            "infrastructure")
+                select_services "infrastructure" "INFRASTRUCTURE"
+                ;;
+        esac
+    done
+    
+    # Show comprehensive summary
+    clear
+    printf '\n%b\n' "${clg}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+    printf '\n%b\n' "${clg}║                                                                               ║${cend}"
+    printf '\n%b\n' "${clg}║                    📋 INSTALLATION SUMMARY                                      ║${cend}"
+    printf '\n%b\n' "${clg}║                                                                               ║${cend}"
+    printf '\n%b\n' "${clg}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+    
+    local total_services=0
+    printf '\n%b\n' " ${cy}═══════════════════════════════════════════════════════════════════════════════${cend}"
+    printf '\n%b\n' " ${uyc} Selected Stacks: ${clc}${#stacks_to_install[@]}${cend}"
+    printf '\n%b\n' " ${cy}═══════════════════════════════════════════════════════════════════════════════${cend}"
+    
+    for stack in "${stacks_to_install[@]}"; do
+        local service_count=0
+        local stack_display=""
+        local services_array=()
+        
+        case "$stack" in
+            "servarr")
+                service_count=${#services_servarr[@]:-0}
+                stack_display="SERVARR"
+                services_array=("${services_servarr[@]}")
+                ;;
+            "streamarr")
+                service_count=${#services_streamarr[@]:-0}
+                stack_display="STREAMARR"
+                services_array=("${services_streamarr[@]}")
+                ;;
+            "creatarr")
+                service_count=${#services_creatarr[@]:-0}
+                stack_display="CREATARR"
+                services_array=("${services_creatarr[@]}")
+                ;;
+            "business")
+                service_count=${#services_business[@]:-0}
+                stack_display="BUSINESS"
+                services_array=("${services_business[@]}")
+                ;;
+            "infrastructure")
+                service_count=${#services_infrastructure[@]:-0}
+                stack_display="INFRASTRUCTURE"
+                services_array=("${services_infrastructure[@]}")
+                ;;
+        esac
+        
+        total_services=$((total_services + service_count))
+        
+        if [[ $service_count -gt 0 ]]; then
+            printf '\n%b\n' " ${clg}${stack_display}${cend} - ${clc}${service_count}${cend} service(s):"
+            for service in "${services_array[@]}"; do
+                printf '%b\n' "   ${clc}•${cend} ${service}"
+            done
+        else
+            printf '\n%b\n' " ${uyc}${stack_display}${cend} - ${cy}No services selected (will be skipped)${cend}"
+        fi
+    done
+    
+    printf '\n%b\n' " ${cy}═══════════════════════════════════════════════════════════════════════════════${cend}"
+    printf '\n%b\n' " ${clg}Total: ${clc}${#stacks_to_install[@]}${clg} stack(s), ${clc}${total_services}${clg} service(s)${cend}"
+    printf '\n%b\n' " ${cy}═══════════════════════════════════════════════════════════════════════════════${cend}"
+    
+    printf '\n'
+    printf '%b' " ${uyc} ${clg}Ready to proceed?${cend} [Y/n]: "
+    read -r confirm_install
+    if [[ "$confirm_install" =~ ^[Nn]$ ]]; then
+        printf '\n%b\n' " ${ucross} Installation cancelled by user."
+        exit 0
+    fi
+    
+    printf '\n%b\n' " ${utick} ${clg}Starting installation...${cend}"
+    sleep 1
+    
     # Create directory structure
     if ! create_directories_for_platform; then
         cleanup_failed_installation "$base_path" "directory creation" "$compose_cmd"
@@ -1575,16 +2615,20 @@ main() {
         exit 1
     fi
     
-    # Configure VPN settings
-    if ! configure_vpn_settings; then
-        printf '\n%b\n' " ${uyc} VPN configuration failed, but continuing with setup..."
-        printf '\n%b\n' " ${uyc} You can configure VPN settings manually later"
+    # Configure VPN settings (only if SERVARR stack is selected)
+    if [[ " ${stacks_to_install[@]} " =~ " servarr " ]]; then
+        if ! configure_vpn_settings; then
+            printf '\n%b\n' " ${uyc} VPN configuration failed, but continuing with setup..."
+            printf '\n%b\n' " ${uyc} You can configure VPN settings manually later"
+        fi
     fi
     
-    # Configure n8n encryption key
-    if ! configure_n8n_encryption; then
-        printf '\n%b\n' " ${uyc} n8n encryption configuration failed, but continuing with setup..."
-        printf '\n%b\n' " ${uyc} You can configure n8n encryption manually later"
+    # Configure n8n encryption key (only if BUSINESS stack is selected)
+    if [[ " ${stacks_to_install[@]} " =~ " business " ]]; then
+        if ! configure_n8n_encryption; then
+            printf '\n%b\n' " ${uyc} n8n encryption configuration failed, but continuing with setup..."
+            printf '\n%b\n' " ${uyc} You can configure n8n encryption manually later"
+        fi
     fi
     
     # Fix permissions before deployment
@@ -1605,6 +2649,8 @@ main() {
             printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-servarr -f docker-compose-servarr.yml up -d${cend}"
             printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-streamarr -f docker-compose-streamarr.yml up -d${cend}"
             printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-creatarr -f docker-compose-creatarr.yml up -d${cend}"
+            printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-business -f docker-compose-business.yml up -d${cend}"
+            printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-infrastructure -f docker-compose-infrastructure.yml up -d${cend}"
             exit 1
         fi
     else
@@ -1612,6 +2658,8 @@ main() {
         printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-servarr -f docker-compose-servarr.yml up -d${cend}"
         printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-streamarr -f docker-compose-streamarr.yml up -d${cend}"
         printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-creatarr -f docker-compose-creatarr.yml up -d${cend}"
+        printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-business -f docker-compose-business.yml up -d${cend}"
+        printf '\n%b\n' " ${clc}${compose_cmd} --env-file .env-infrastructure -f docker-compose-infrastructure.yml up -d${cend}"
     fi
     
     printf '\n%b\n' " ${utick} ${clg}Homelab Media Stack setup complete!${cend}"

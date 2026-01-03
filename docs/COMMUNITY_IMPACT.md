@@ -28,19 +28,12 @@ The `scripts/setup.sh` script represents a breakthrough in homelab automation:
 **Before:**
 ```bash
 # Traditional approach - 50+ manual steps
-mkdir -p /volume1/docker/servarr
-mkdir -p /volume1/docker/streamarr
-mkdir -p /volume1/docker/creatarr
-mkdir -p /volume1/data/downloads/complete
-mkdir -p /volume1/data/roms
-mkdir -p /volume1/data/comics
-mkdir -p /volume1/data/audiobooks
-mkdir -p /volume1/data/podcasts
-mkdir -p /volume1/data/books
-mkdir -p /volume1/data/recipes
-mkdir -p /volume1/data/saves
-# ... 40+ more manual steps
-# Docker Compose handles network creation automatically
+mkdir -p /volume1/docker/{servarr,streamarr,creatarr,business,infrastructure}
+mkdir -p /volume1/data/{downloads/{complete,incomplete},media/{movies,tv,music},plex_transcode,roms,comics,audiobooks,podcasts,books,recipes,saves}
+# Configure environment files for each stack
+# Set up VPN credentials
+# Create Docker networks
+# Deploy containers
 # ... hours of configuration
 ```
 
