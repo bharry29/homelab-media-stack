@@ -346,6 +346,8 @@ detect_platform() {
     
     printf '\n%b\n' " ${utick} Platform selected: ${clc}${platform}${cend}"
     printf '%b\n' " ${utick} Default path: ${clc}${default_base_path}${cend}"
+    printf '\n%b\n' " ${uyc} ${cy}Note:${cend} Installation will create directories in ${clc}${default_base_path}/docker${cend} and ${clc}${default_base_path}/data${cend}"
+    printf '%b\n' " ${uyc} You can change this path when prompted if you prefer a different location"
     printf '%b\n' " ${utick} PUID/PGID: ${clc}${puid}:${pgid}${cend}"
 }
 
@@ -462,6 +464,10 @@ create_directories_for_platform() {
     
     if [[ " ${stacks_to_install[@]} " =~ " infrastructure " ]]; then
         directories+=("${base_path}/docker/infrastructure")
+    fi
+    
+    if [[ " ${stacks_to_install[@]} " =~ " websites " ]]; then
+        directories+=("${base_path}/docker/websites")
     fi
     
     # Create directories with progress
@@ -868,16 +874,18 @@ select_stacks() {
     printf '\n%b\n' "${clg}║                                                                               ║${cend}"
     printf '\n%b\n' "${clg}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
     
-    printf '\n%b\n' " ${cy}Choose which stacks you want to install:${cend}"
-    printf '\n%b\n' " ${uyc} ${clc}Tip:${cend} Enter numbers separated by spaces (e.g., ${clc}1 3 5${cend}) or ${clc}all${cend} for everything"
-    printf '\n'
-    
     # INFRASTRUCTURE is mandatory - always included
     declare -g stacks_to_install=("infrastructure")
     
+    # Display infrastructure info first (default installation)
+    printf '\n%b\n' " ${clg}✓ INFRASTRUCTURE Stack${cend} ${cy}(Installed by default)${cend}"
+    printf '%b\n' " ${cy}   └─ Homarr (Dashboard), Uptime Kuma (Monitoring), Watchtower (Auto Updates for all stacks)${cend}"
+    printf '\n'
+    printf '%b\n' " ${uyc} ${cy}Select additional stacks to install:${cend}"
+    printf '\n%b\n' " ${uyc} ${clc}Tip:${cend} Enter numbers separated by spaces (e.g., ${clc}1 3 5${cend}) or ${clc}all${cend} for everything"
+    printf '\n'
+    
     local stack_options=(
-        "INFRASTRUCTURE - System Management (REQUIRED)"
-        "  └─ Homarr (Dashboard), Uptime Kuma (Monitoring), Watchtower (Auto Updates for all stacks)"
         "SERVARR - Media Management & Downloads"
         "  └─ VPN, qBittorrent, Sonarr, Radarr, Lidarr, Bazarr, Prowlarr, FileBot"
         "STREAMARR - Streaming & Consumption"
@@ -886,51 +894,44 @@ select_stacks() {
         "  └─ RetroArch, Komga, Audiobookshelf, Calibre-Web, Noisedash, Swing Music"
         "BUSINESS - Business & Productivity"
         "  └─ n8n (Workflow Automation), Mealie (Recipe Management)"
+        "WEBSITES - Custom Web Applications"
+        "  └─ Host your own custom websites and web applications"
     )
     
-    # Display options with better formatting
+    # Display options with better formatting (only the 5 selectable stacks)
     local option_num=1
-    local actual_options=()
     for ((i=0; i<${#stack_options[@]}; i++)); do
         if [[ "${stack_options[$i]}" =~ ^[A-Z]+ ]]; then
-            if [[ "${stack_options[$i]}" =~ "REQUIRED" ]]; then
-                printf '\n%b\n' " ${clc}${option_num})${cend} ${clg}${stack_options[$i]}${cend} ${cy}(Auto-selected)${cend}"
-            else
-                printf '\n%b\n' " ${clc}${option_num})${cend} ${clg}${stack_options[$i]}${cend}"
-            fi
-            actual_options+=("${stack_options[$i]}")
+            printf '\n%b\n' " ${clc}${option_num})${cend} ${clg}${stack_options[$i]}${cend}"
             ((option_num++))
         else
             printf '%b\n' " ${stack_options[$i]}"
         fi
     done
-    
-    printf '\n'
-    printf '%b\n' " ${cy}Note:${cend} INFRASTRUCTURE stack is ${clg}required${cend} and automatically selected"
     printf '\n'
     while true; do
-        printf '%b' " ${uyc} Select additional stacks ${clc}[1-4, all]:${cend} "
+        printf '%b' " ${uyc} Select stacks ${clc}[1-5, all, or press Enter for INFRASTRUCTURE only]:${cend} "
         read -r input
         
         if [[ -z "$input" ]]; then
             # If empty, just use infrastructure (already selected)
-            printf '\n%b\n' " ${utick} ${clg}INFRASTRUCTURE stack selected (required)${cend}"
-            printf '\n%b\n' " ${uyc} Selected: ${clc}1${cend} stack (INFRASTRUCTURE)"
+            printf '\n%b\n' " ${utick} ${clg}INFRASTRUCTURE stack will be installed automatically${cend}"
+            printf '\n%b\n' " ${uyc} Selected: ${clc}0${cend} additional stacks (INFRASTRUCTURE only)"
             return 0
         fi
         
         if [[ "$input" == "all" ]] || [[ "$input" == "ALL" ]]; then
-            # Select all additional stacks (infrastructure already included)
-            stacks_to_install+=("servarr" "streamarr" "creatarr" "business")
+            # Select all stacks (infrastructure already included)
+            stacks_to_install+=("servarr" "streamarr" "creatarr" "business" "websites")
             printf '\n%b\n' " ${utick} ${clg}All stacks selected!${cend}"
-            printf '\n%b\n' " ${uyc} Selected: ${clc}${#stacks_to_install[@]}${cend} stacks"
+            printf '\n%b\n' " ${uyc} INFRASTRUCTURE stack: ${clg}Installed automatically${cend}"
+            printf '\n%b\n' " ${uyc} Selected: ${clc}5${cend} additional stacks:"
             for stack in "${stacks_to_install[@]}"; do
-                if [[ "$stack" == "infrastructure" ]]; then
-                    printf '%b\n' " ${clc}  ✓${cend} ${stack} ${cy}(required)${cend}"
-                else
+                if [[ "$stack" != "infrastructure" ]]; then
                     printf '%b\n' " ${clc}  ✓${cend} ${stack}"
                 fi
             done
+            printf '\n%b\n' " ${uyc} Total stacks to install: ${clc}6${cend} (including INFRASTRUCTURE)"
             return 0
         fi
         
@@ -938,12 +939,13 @@ select_stacks() {
         local valid=true
         local temp_selected=()
         for num in $input; do
-            if [[ "$num" =~ ^[0-9]+$ ]] && [[ $num -ge 1 ]] && [[ $num -le 4 ]]; then
+            if [[ "$num" =~ ^[0-9]+$ ]] && [[ $num -ge 1 ]] && [[ $num -le 5 ]]; then
                 case "$num" in
                     1) temp_selected+=("servarr") ;;
                     2) temp_selected+=("streamarr") ;;
                     3) temp_selected+=("creatarr") ;;
                     4) temp_selected+=("business") ;;
+                    5) temp_selected+=("websites") ;;
                 esac
             else
                 valid=false
@@ -960,14 +962,12 @@ select_stacks() {
             done
             
             printf '\n%b\n' " ${utick} ${clg}Stacks selected!${cend}"
-            printf '\n%b\n' " ${uyc} Selected: ${clc}${#stacks_to_install[@]}${cend} stack(s):"
-            for stack in "${stacks_to_install[@]}"; do
-                if [[ "$stack" == "infrastructure" ]]; then
-                    printf '%b\n' " ${clc}  ✓${cend} ${stack} ${cy}(required)${cend}"
-                else
-                    printf '%b\n' " ${clc}  ✓${cend} ${stack}"
-                fi
+            printf '\n%b\n' " ${uyc} INFRASTRUCTURE stack: ${clg}Installed automatically${cend}"
+            printf '\n%b\n' " ${uyc} Selected: ${clc}${#temp_selected[@]}${cend} additional stack(s):"
+            for stack in "${temp_selected[@]}"; do
+                printf '%b\n' " ${clc}  ✓${cend} ${stack}"
             done
+            printf '\n%b\n' " ${uyc} Total stacks to install: ${clc}$((${#temp_selected[@]} + 1))${cend} (including INFRASTRUCTURE)"
             
             # Initialize service arrays
             declare -g services_servarr=()
@@ -975,6 +975,7 @@ select_stacks() {
             declare -g services_creatarr=()
             declare -g services_business=()
             declare -g services_infrastructure=()
+            declare -g services_websites=()
             
             return 0
         else
@@ -1097,6 +1098,15 @@ select_services() {
                 "Keep containers updated"
             )
             service_map=("homarr" "uptime-kuma" "watchtower")
+            ;;
+        "websites")
+            service_options=(
+                "Custom Websites (Add your own websites)"
+            )
+            service_descriptions=(
+                "Template for hosting custom websites - see docs/WEBSITES_STACK_GUIDE.md"
+            )
+            service_map=("custom-websites")
             ;;
     esac
     
@@ -1221,6 +1231,9 @@ select_services() {
                     ;;
                 "infrastructure")
                     services_infrastructure=("${selected_services[@]}")
+                    ;;
+                "websites")
+                    services_websites=("${selected_services[@]}")
                     ;;
             esac
             
@@ -1897,8 +1910,32 @@ configure_environment_files() {
         printf '\n%b\n' " ${uyc} .env-infrastructure already exists, skipping"
     fi
     
+    # Configure websites environment
+    if [[ " ${stacks_to_install[@]} " =~ " websites " ]] && [[ ! -f ".env-websites" ]]; then
+        if [[ -f ".env-websites.example" ]]; then
+            cp ".env-websites.example" ".env-websites"
+            
+            # Update paths based on platform
+            if [[ "$platform" == "synology" ]] || [[ "$platform" == "qnap" ]] || [[ "$platform" == "ugreen" ]]; then
+                sed -i.bak "s|/volume1|${unix_path}|g" ".env-websites"
+            else
+                sed -i.bak "s|/volume1|${base_path}|g" ".env-websites"
+            fi
+            
+            sed -i.bak "s|PUID=1000|PUID=${puid}|g" ".env-websites"
+            sed -i.bak "s|PGID=1000|PGID=${pgid}|g" ".env-websites"
+            sed -i.bak "s|TZ=America/New_York|TZ=${timezone}|g" ".env-websites"
+            
+            printf '\n%b\n' " ${utick} Created .env-websites with ${platform} settings"
+        else
+            printf '\n%b\n' " ${ucross} Warning: .env-websites.example not found"
+        fi
+    else
+        printf '\n%b\n' " ${uyc} .env-websites already exists, skipping"
+    fi
+    
     # Clean up backup files
-    rm -f ".env-servarr.bak" ".env-streamarr.bak" ".env-creatarr.bak" ".env-business.bak" ".env-infrastructure.bak" 2>/dev/null || true
+    rm -f ".env-servarr.bak" ".env-streamarr.bak" ".env-creatarr.bak" ".env-business.bak" ".env-infrastructure.bak" ".env-websites.bak" 2>/dev/null || true
     
     printf '\n%b\n' " ${utick} Environment files configured!"
 }
@@ -2070,6 +2107,33 @@ deploy_stacks() {
         fi
     fi
     
+    # Deploy WEBSITES stack
+    if [[ " ${stacks_to_install[@]} " =~ " websites " ]]; then
+        printf '\n%b\n' "${cm}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+        printf '\n%b\n' "${cm}║                                                                               ║${cend}"
+        printf '\n%b\n' "${cm}║                    DEPLOYING WEBSITES STACK                                     ║${cend}"
+        printf '\n%b\n' "${cm}║                                                                               ║${cend}"
+        printf '\n%b\n' "${cm}║                    (Custom Web Applications)                                    ║${cend}"
+        printf '\n%b\n' "${cm}║                                                                               ║${cend}"
+        printf '\n%b\n' "${cm}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+        
+        show_loading_message "Launching WEBSITES services" 3
+        
+        # Deploy selected services
+        if [[ ${#services_websites[@]} -gt 0 ]]; then
+            if $compose_cmd --env-file .env-websites -f docker-compose-websites.yml up -d "${services_websites[@]}"; then
+                printf '\n%b\n' " ${utick} WEBSITES stack deployed successfully!"
+                printf '\n%b\n' " ${uyc} ${cy}Note:${cend} Add your custom websites to ${clc}docker-compose-websites.yml${cend}"
+                printf '\n%b\n' " ${uyc} See ${clc}docs/WEBSITES_STACK_GUIDE.md${cend} for detailed instructions"
+            else
+                printf '\n%b\n' " ${ucross} Failed to deploy WEBSITES stack"
+                return 1
+            fi
+        else
+            printf '\n%b\n' " ${uyc} No services selected for WEBSITES stack"
+        fi
+    fi
+    
     return 0
 }
 
@@ -2210,6 +2274,24 @@ show_access_info() {
         fi
     fi
     
+    # WEBSITES Stack
+    if [[ " ${stacks_to_install[@]} " =~ " websites " ]]; then
+        printf '\n%b\n' "${cm}╔═══════════════════════════════════════════════════════════════════════════════╗${cend}"
+        printf '\n%b\n' "${cm}║                                                                               ║${cend}"
+        printf '\n%b\n' "${cm}║                    WEBSITES STACK (Custom Web Applications)                   ║${cend}"
+        printf '\n%b\n' "${cm}║                                                                               ║${cend}"
+        printf '\n%b\n' "${cm}╚═══════════════════════════════════════════════════════════════════════════════╝${cend}"
+        
+        printf '\n%b\n' " ${uyc} ${cy}Note:${cend} Add your custom websites to ${clc}docker-compose-websites.yml${cend}"
+        printf '\n%b\n' " ${uyc} See ${clc}docs/WEBSITES_STACK_GUIDE.md${cend} for detailed instructions"
+        printf '\n%b\n' " ${uyc} Template websites included: ${clc}mindkindproject-v2${cend} and ${clc}thegaragelabs-cc${cend}"
+    fi
+    
+    printf '\n%b\n' " ${uyc} ${cy}Installation Location:${cend}"
+    printf '\n%b\n' " ${clc}•${cend} Docker configs: ${base_path}/docker/"
+    printf '\n%b\n' " ${clc}•${cend} Media data: ${base_path}/data/"
+    printf '\n%b\n' " ${uyc} ${cy}Note:${cend} If you want to use a different path, edit the .env files and redeploy"
+    printf '\n'
     printf '\n%b\n' " ${uyc} ${cy}Next Steps:${cend}"
     printf '\n%b\n' " ${clc}1.${cend} Set up download clients in Sonarr/Radarr"
     printf '\n%b\n' " ${clc}2.${cend} Add indexers in Prowlarr"
@@ -2477,10 +2559,14 @@ main() {
     
     # Get base path from user with default
     printf '\n%b\n' " ${uyc} Configure installation paths:"
+    printf '%b\n' " ${uyc} The script will install stacks in ${clc}${default_base_path}/docker${cend} (configs) and ${clc}${default_base_path}/data${cend} (media)"
+    printf '%b\n' " ${uyc} You can change this to any path you prefer (e.g., /volume2, /mnt/storage, etc.)"
+    printf '\n'
     printf '%b' " Base path for installation [${clc}${default_base_path}${cend}]: "
     read -r user_base_path
     base_path="${user_base_path:-$default_base_path}"
     printf '\n%b\n' " ${utick} Using base path: ${clc}${base_path}${cend}"
+    printf '%b\n' " ${uyc} Directories will be created at: ${clc}${base_path}/docker${cend} and ${clc}${base_path}/data${cend}"
     
     # Get network information
     if ! get_platform_network_info; then
