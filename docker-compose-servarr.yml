@@ -1,13 +1,14 @@
 # =============================================================================
-# SERVARR STACK - Media Management & Download Services  
+# SERVARR STACK - Media Management & Download Services
 # =============================================================================
-# 
+#
 # This stack handles all download and media management operations:
 # • VPN-protected downloads via Gluetun
-# • Torrent client (qBittorrent)  
+# • Torrent client (qBittorrent)
 # • Indexer management (Prowlarr)
 # • Media automation (*arr suite: Sonarr, Radarr, Lidarr, Bazarr)
 # • File processing and organization (FileBot)
+# • Music downloads (Tidarr) and ebook management (Calibre)
 # • Automatic updates (Watchtower)
 #
 # Network: 172.39.0.0/24 (isolated from other stacks)
@@ -50,16 +51,16 @@ services:
   # Routes all download traffic through VPN for privacy and security
   # Provides network gateway for qBittorrent and Prowlarr
   gluetun:
-    image: qmcgaw/gluetun:latest
+    image: qmcgaw/gluetun:v3.41.0
     container_name: gluetun
     hostname: gluetun
     restart: unless-stopped
-    
+
     # Network configuration
     networks:
       servarr-network:
         ipv4_address: 172.39.0.2
-    
+
     # Port forwarding for VPN-protected services
     ports:
       - "8080:8080"                           # qBittorrent web interface
@@ -67,42 +68,43 @@ services:
       - "6881:6881/udp"                       # qBittorrent torrent port (UDP)
       - "8090:8090"                           # SABnzbd web interface
       - "9696:9696"                           # Prowlarr web interface
-    
+      - "8765:80"                             # Speedtest Tracker web interface
+
     # Required capabilities and devices
     cap_add:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
-    
+
     # System configuration
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=1
-    
+
     # Persistent storage
     volumes:
       - ${SERVARR_CONFIG_PATH}/gluetun:/gluetun
       - /etc/localtime:/etc/localtime:ro
-    
+
     # VPN configuration (from environment file)
     environment:
       # VPN Provider Settings
       - VPN_SERVICE_PROVIDER=${VPN_SERVICE_PROVIDER}
       - VPN_TYPE=${VPN_TYPE:-openvpn}
-      - OPENVPN_USER=${OPENVPN_USER}
-      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
-      
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
+
       # Server Selection
       - SERVER_COUNTRIES=${SERVER_COUNTRIES}
       - SERVER_CITIES=${SERVER_CITIES:-}
-      
+      - SERVER_CATEGORIES=${SERVER_CATEGORIES}
+
       # Network Security
       - FIREWALL_VPN_INPUT_PORTS=${FIREWALL_VPN_INPUT_PORTS:-}
       - FIREWALL_OUTBOUND_SUBNETS=172.39.0.0/24
-      
+
       # Health Monitoring
       - HEALTH_VPN_DURATION_INITIAL=${HEALTH_VPN_DURATION_INITIAL:-60s}
       - LOG_LEVEL=${VPN_LOG_LEVEL:-info}
-    
+
     # Health check to ensure VPN connectivity
     healthcheck:
       test: ping -c 1 www.google.com || exit 1
@@ -110,7 +112,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
-    
+
     # Update management
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -123,16 +125,16 @@ services:
     image: lscr.io/linuxserver/qbittorrent:latest
     container_name: qbittorrent
     restart: unless-stopped
-    
+
     # Use VPN network stack (no direct internet access)
     network_mode: service:gluetun
-    
+
     # Wait for VPN to be healthy before starting
     depends_on:
       gluetun:
         condition: service_healthy
         restart: true
-    
+
     # User and system configuration
     environment:
       - PUID=${PUID}
@@ -140,13 +142,13 @@ services:
       - TZ=${TZ}
       - WEBUI_PORT=8080
       - TORRENTING_PORT=${FIREWALL_VPN_INPUT_PORTS:-6881}
-    
+
     # Persistent storage and shared data
     volumes:
       - ${SERVARR_CONFIG_PATH}/qbittorrent:/config
       - ${DATA_PATH}:/data
       - /etc/localtime:/etc/localtime:ro
-    
+
     # Health monitoring
     healthcheck:
       test: ping -c 1 www.google.com || exit 1
@@ -154,7 +156,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    
+
     # Update management
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -167,17 +169,16 @@ services:
     image: ghcr.io/hotio/sabnzbd:latest
     container_name: sabnzbd
     restart: unless-stopped
-    user: "${PUID}:${PGID}"
-    
+
     # Use VPN network stack (no direct internet access)
     network_mode: service:gluetun
-    
+
     # Wait for VPN to be healthy before starting
     depends_on:
       gluetun:
         condition: service_healthy
         restart: true
-    
+
     # User and system configuration
     environment:
       - PUID=${PUID}
@@ -185,13 +186,13 @@ services:
       - TZ=${TZ}
       - UMASK=002
       - WEBUI_PORTS=8090/tcp,8090/udp
-    
+
     # Persistent storage and shared data
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ${SERVARR_CONFIG_PATH}/sabnzbd:/config
       - ${DATA_PATH}:/data
-    
+
     # Update management
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -204,27 +205,27 @@ services:
     image: lscr.io/linuxserver/prowlarr:latest
     container_name: prowlarr
     restart: unless-stopped
-    
+
     # Use VPN network stack for indexer access
     network_mode: service:gluetun
-    
+
     # Wait for VPN to be healthy before starting
     depends_on:
       gluetun:
         condition: service_healthy
         restart: true
-    
+
     # User and system configuration
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-    
+
     # Persistent storage
     volumes:
       - ${SERVARR_CONFIG_PATH}/prowlarr:/config
       - /etc/localtime:/etc/localtime:ro
-    
+
     # Update management
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -238,28 +239,28 @@ services:
     container_name: sonarr
     hostname: sonarr
     restart: unless-stopped
-    
+
     # Direct network access (not through VPN)
     networks:
       servarr-network:
         ipv4_address: 172.39.0.3
-    
+
     # External access
     ports:
       - "${SONARR_PORT:-8989}:8989"
-    
+
     # User and system configuration
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-    
+
     # Persistent storage and shared data
     volumes:
       - ${SERVARR_CONFIG_PATH}/sonarr:/config
       - ${DATA_PATH}:/data
       - /etc/localtime:/etc/localtime:ro
-    
+
     # Update management
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -273,28 +274,28 @@ services:
     container_name: radarr
     hostname: radarr
     restart: unless-stopped
-    
+
     # Direct network access (not through VPN)
     networks:
       servarr-network:
         ipv4_address: 172.39.0.4
-    
+
     # External access
     ports:
       - "${RADARR_PORT:-7878}:7878"
-    
+
     # User and system configuration
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-    
+
     # Persistent storage and shared data
     volumes:
       - ${SERVARR_CONFIG_PATH}/radarr:/config
       - ${DATA_PATH}:/data
       - /etc/localtime:/etc/localtime:ro
-    
+
     # Update management
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -308,28 +309,28 @@ services:
     container_name: lidarr
     hostname: lidarr
     restart: unless-stopped
-    
+
     # Direct network access (not through VPN)
     networks:
       servarr-network:
         ipv4_address: 172.39.0.5
-    
+
     # External access
     ports:
       - "${LIDARR_PORT:-8686}:8686"
-    
+
     # User and system configuration
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-    
+
     # Persistent storage and shared data
     volumes:
       - ${SERVARR_CONFIG_PATH}/lidarr:/config
       - ${DATA_PATH}:/data
       - /etc/localtime:/etc/localtime:ro
-    
+
     # Update management
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -343,28 +344,28 @@ services:
     container_name: bazarr
     hostname: bazarr
     restart: unless-stopped
-    
+
     # Direct network access (not through VPN)
     networks:
       servarr-network:
         ipv4_address: 172.39.0.6
-    
+
     # External access
     ports:
       - "${BAZARR_PORT:-6767}:6767"
-    
+
     # User and system configuration
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-    
+
     # Persistent storage and shared data
     volumes:
       - ${SERVARR_CONFIG_PATH}/bazarr:/config
       - ${DATA_PATH}:/data
       - /etc/localtime:/etc/localtime:ro
-    
+
     # Update management
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -378,27 +379,27 @@ services:
     container_name: filebot-node
     hostname: filebot-node
     restart: unless-stopped
-    
+
     # Direct network access for web interface
     networks:
       servarr-network:
         ipv4_address: 172.39.0.7
-    
+
     # External access to web interface
     ports:
       - "${FILEBOT_PORT:-5452}:5452"
-    
+
     # User and system configuration
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-    
+
     # Persistent storage and shared data
     volumes:
       - filebot-data:/data
       - ${DATA_PATH}/downloads/:/volume1
-    
+
     # Update management
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -412,25 +413,25 @@ services:
     container_name: filebot-watcher
     hostname: filebot-watcher
     restart: unless-stopped
-    
+
     # Internal network (no external access needed)
     networks:
       servarr-network:
         ipv4_address: 172.39.0.8
-    
+
     # User and system configuration
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
       - SETTLE_DOWN_TIME=${FILEBOT_SETTLE_TIME:-300}
-    
+
     # Persistent storage and shared data
     volumes:
       - filebot-data:/data
       - ${DATA_PATH}/:/data_path
       - ${MEDIA_DATA_PATH}/:/media_data_path
-    
+
     # Processing configuration
     # Monitors: /data_path/downloads/complete (where qBittorrent saves completed files)
     # Outputs:  /media_data_path/ (organized media for Plex)
@@ -445,11 +446,46 @@ services:
       --conflict auto
       -non-strict
       --def excludeList=/media_data_path/amc-exclude-list.txt
-      --def unsorted=y music=y artwork=y clean=y movieDB=TheMovieDB seriesDB=TheMovieDB::TV animeDB=TheMovieDB::TV musicDB=ID3 movieFormat="/media_data_path/{hd ==~ /UHD|QHD/ ? "UHD" : hd ==~ /FHD|HD/ ? "HD" : "SD"}/{info.OriginalLanguage}/{~plex}" animeFormat="/media_data_path/Anime/{info.OriginalLanguage}/{~plex}" seriesFormat="/media_data_path/TV Shows/{info.OriginalLanguage}/{~plex}" unsortedFormat="/media_data_path/Unsorted/" "ut_label=%L" "ut_title=%N" "ut_kind=multi" "ut_dir=%F"
+      --def unsorted=y music=y artwork=y clean=y movieDB=TheMovieDB seriesDB=TheMovieDB::TV animeDB=TheMovieDB::TV musicDB=ID3 movieFormat="/media_data_path/Movies/{hd ==~ /UHD|QHD/ ? 'UHD' : hd ==~ /FHD|HD/ ? 'HD' : 'SD'}/{info.OriginalLanguage}/{~plex}" animeFormat="/media_data_path/Anime/{info.OriginalLanguage}/{~plex}" seriesFormat="/media_data_path/TV Shows/{info.OriginalLanguage}/{~plex}" unsortedFormat="/media_data_path/Unsorted/{~plex}" "ut_label=%L" "ut_title=%N" "ut_kind=multi" "ut_dir=%F"
       --def plex=${PLEX_TOKEN}
       --def discord=${DISCORD_WEBHOOK}
-    
+
     # Update management
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+
+  # ---------------------------------------------------------------------------
+  # VPN SPEED MONITORING
+  # ---------------------------------------------------------------------------
+  # Scheduled speedtests run through the VPN tunnel, with history graphs
+  speedtest-tracker:
+    image: lscr.io/linuxserver/speedtest-tracker:latest
+    container_name: speedtest-tracker
+    restart: unless-stopped
+
+    # Use VPN network stack (measures the VPN connection)
+    network_mode: service:gluetun
+
+    depends_on:
+      gluetun:
+        condition: service_healthy
+        restart: true
+
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - APP_KEY=${SPEEDTEST_APP_KEY}
+      - APP_URL=http://${HOST_IP:-localhost}:8765
+      - DB_CONNECTION=sqlite
+      - SPEEDTEST_SCHEDULE=${SPEEDTEST_SCHEDULE:-0 */6 * * *}
+      # - SPEEDTEST_SERVERS=12345,67890   # optional: pin servers near your VPN exit
+
+    volumes:
+      - ${SERVARR_CONFIG_PATH}/speedtest-tracker:/config
+      - /etc/localtime:/etc/localtime:ro
+
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 

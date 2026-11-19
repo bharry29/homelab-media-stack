@@ -1,20 +1,40 @@
 # =============================================================================
-# INFRASTRUCTURE STACK - System Management & Monitoring Services
+# INFRASTRUCTURE STACK - System Management, Monitoring & Inventory
 # =============================================================================
 #
-# This stack handles infrastructure and monitoring services:
-# • Service dashboard (Homarr)
-# • System monitoring (Uptime Kuma)
-# • Automatic updates (Watchtower)
+# Host:     your-nas (NAS_IP)
+# Managed:  Portainer CE -> Stacks -> "infrastructure"
+# Repo:     homelab/stacks/ugreen/infrastructure/compose.yml (keep in sync)
 #
-# Network: 172.43.0.0/24 (isolated from other stacks)
-# Data: Shared /data volume with other stacks (if needed)
-# Environment: Configure via .env-infrastructure file
+# Services:
+#   • Homepage      - service dashboard with live widgets      :7575
+#   • Uptime Kuma   - uptime monitoring + Discord alerts        :3001
+#   • Watchtower    - nightly auto-updates (labelled only)      (no port)
+#   • NetBox        - homelab inventory / source of truth       :8010
+#       + netbox-worker, netbox-postgres (PG 18), netbox-redis (Valkey 9)
 #
-# Deploy: docker-compose --env-file .env-infrastructure -f docker-compose-infrastructure.yml up -d
+# Network:  infrastructure-network 172.43.0.0/24 (fixed IPs, see each service)
+#           Allowed by UGOS firewall rule 3 (172.32.0.0/11). Containers on any
+#           subnet outside the firewall allow-list cannot make outbound calls.
+#
+# Exposure: Nothing here is port-forwarded. Public access only via
+#           Cloudflare Tunnel -> NPM, behind Cloudflare Access (PIN login):
+#             homepage.thegaragelabs.cc -> NAS_IP:7575  (Access: your-access-app)
+#           NetBox and Uptime Kuma are LAN-only. If you ever publish NetBox, add
+#           netbox.thegaragelabs.cc to the your-access-app Access app FIRST.
+#
+# Environment: Portainer stack environment variables (never commit real values).
+#           Template: homelab/stacks/ugreen/infrastructure/.env.example
+#
+# Updates:  Watchtower updates containers labelled watchtower.enable=true at
+#           06:00 daily (6-field cron). NetBox, Postgres and Valkey are labelled
+#           false - their upgrades run DB migrations; update them deliberately
+#           (pin NETBOX_IMAGE_TAG, read netbox-docker release notes first).
+#
+# Backups:  ${INFRASTRUCTURE_CONFIG_PATH}/homepage + /uptime-kuma (bind mounts)
+#           NetBox data lives in named volumes infrastructure_netbox-* -
+#           back up infrastructure_netbox-postgres (or pg_dump) and _netbox-media.
 # =============================================================================
-
-version: '3.8'
 
 # =============================================================================
 # NETWORKS
@@ -27,6 +47,58 @@ networks:
       config:
         - subnet: 172.43.0.0/24
           gateway: 172.43.0.1
+          # IP plan: .2 homepage | .3 uptime-kuma | .4 watchtower
+          #          .10 netbox  | .11 netbox-worker | .12 netbox-postgres | .13 netbox-redis
+
+# =============================================================================
+# VOLUMES - NetBox data (Docker named volumes; avoids host permission issues)
+# Portainer shows them as infrastructure_netbox-<name>
+# =============================================================================
+volumes:
+  netbox-media:      # uploaded images/attachments
+  netbox-reports:    # custom reports
+  netbox-scripts:    # custom scripts
+  netbox-postgres:   # NetBox database (Postgres 18)
+  netbox-redis:      # task queue / cache persistence
+
+# =============================================================================
+# NETBOX SHARED SETTINGS - YAML anchor reused by `netbox` and `netbox-worker`
+# Image: netbox-docker 5.1.0 = NetBox 4.7.x (Granian server, internal port 8080)
+# =============================================================================
+x-netbox: &netbox
+  image: docker.io/netboxcommunity/netbox:${NETBOX_IMAGE_TAG:-v4.7-5.1.0}
+  restart: unless-stopped
+  environment:
+    TZ: ${TZ}
+    # Hostnames NetBox answers to - SPACE-separated (commas break it -> 400 / unhealthy)
+    ALLOWED_HOSTS: ${NETBOX_ALLOWED_HOSTS}
+    # Required secrets, 50+ chars each. Generate with: openssl rand -hex 32
+    SECRET_KEY: ${NETBOX_SECRET_KEY}
+    API_TOKEN_PEPPER_1: ${NETBOX_API_TOKEN_PEPPER}
+    # Database (netbox-postgres below). Password is fixed on the DB's first start -
+    # changing it later requires recreating the netbox-postgres volume.
+    DB_HOST: netbox-postgres
+    DB_NAME: netbox
+    DB_USER: netbox
+    DB_PASSWORD: ${NETBOX_DB_PASSWORD}
+    # Task queue (db 0) and cache (db 1) share one Valkey instance
+    REDIS_HOST: netbox-redis
+    REDIS_PASSWORD: ${NETBOX_REDIS_PASSWORD}
+    REDIS_DATABASE: 0
+    REDIS_CACHE_HOST: netbox-redis
+    REDIS_CACHE_PASSWORD: ${NETBOX_REDIS_PASSWORD}
+    REDIS_CACHE_DATABASE: 1
+    # Creates the admin login on first start (ignored if it already exists)
+    SKIP_SUPERUSER: "false"
+    SUPERUSER_NAME: ${NETBOX_SUPERUSER_NAME}
+    SUPERUSER_EMAIL: ${NETBOX_SUPERUSER_EMAIL}
+    SUPERUSER_PASSWORD: ${NETBOX_SUPERUSER_PASSWORD}
+  volumes:
+    - netbox-media:/opt/netbox/netbox/media
+    - netbox-reports:/opt/netbox/netbox/reports
+    - netbox-scripts:/opt/netbox/netbox/scripts
+  labels:
+    - "com.centurylinklabs.watchtower.enable=false"
 
 # =============================================================================
 # SERVICES
@@ -34,135 +106,217 @@ networks:
 services:
 
   # ---------------------------------------------------------------------------
-  # SERVICE DASHBOARD
+  # SERVICE DASHBOARD - Homepage                      http://NAS_IP:7575
   # ---------------------------------------------------------------------------
-  # Unified dashboard for managing all homelab services
-  homarr:
-    image: ghcr.io/ajnart/homarr:latest
-    container_name: homarr
-    hostname: homarr
+  # YAML-configured dashboard with live widgets for every stack. Listens on 3000
+  # internally. Public: homepage.thegaragelabs.cc (behind Cloudflare Access).
+  # Widgets call other apps from 172.43.0.2 - relies on UGOS firewall rule 3.
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    hostname: homepage
     restart: unless-stopped
-    
-    # Direct network access
     networks:
       infrastructure-network:
         ipv4_address: 172.43.0.2
-    
-    # External access to dashboard
     ports:
-      - "${HOMARR_PORT:-7575}:7575"
-    
-    # User and system configuration
+      - "${HOMEPAGE_PORT:-7575}:3000"
     environment:
       - PUID=${PUID}
-      - PGID=${PGID}
+      - PGID=${DOCKER_GID}
       - TZ=${TZ}
-    
-    # Persistent storage and Docker integration
+      # Every host:port / domain you browse to - COMMA-separated, e.g.
+      # NAS_IP:7575,localhost:7575,homepage.thegaragelabs.cc
+      - HOMEPAGE_ALLOWED_HOSTS=${HOMEPAGE_ALLOWED_HOSTS}
+      # Widget secrets - referenced in services.yaml as {{HOMEPAGE_VAR_*}}
+      - HOMEPAGE_VAR_NAS_IP=${NAS_IP}
+      - HOMEPAGE_VAR_SONARR_KEY=${SONARR_API_KEY}
+      - HOMEPAGE_VAR_RADARR_KEY=${RADARR_API_KEY}
+      - HOMEPAGE_VAR_LIDARR_KEY=${LIDARR_API_KEY}
+      - HOMEPAGE_VAR_PROWLARR_KEY=${PROWLARR_API_KEY}
+      - HOMEPAGE_VAR_BAZARR_KEY=${BAZARR_API_KEY}
+      - HOMEPAGE_VAR_SAB_KEY=${SABNZBD_API_KEY}
+      - HOMEPAGE_VAR_QBIT_USER=${QBIT_USER}
+      - HOMEPAGE_VAR_QBIT_PASS=${QBIT_PASS}
+      - HOMEPAGE_VAR_PLEX_TOKEN=${PLEX_TOKEN}
+      - HOMEPAGE_VAR_OVERSEERR_KEY=${OVERSEERR_API_KEY}
+      - HOMEPAGE_VAR_TAUTULLI_KEY=${TAUTULLI_API_KEY}
+      - HOMEPAGE_VAR_PORTAINER_KEY=${PORTAINER_API_KEY}
     volumes:
-      - ${INFRASTRUCTURE_CONFIG_PATH}/homarr/configs:/app/data/configs
-      - ${INFRASTRUCTURE_CONFIG_PATH}/homarr/icons:/app/public/icons
-      - ${INFRASTRUCTURE_CONFIG_PATH}/homarr/data:/data
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    
-    # Update management
+      - ${INFRASTRUCTURE_CONFIG_PATH}/homepage/config:/app/config
+      - ${INFRASTRUCTURE_CONFIG_PATH}/homepage/icons:/app/public/icons
+      - /var/run/docker.sock:/var/run/docker.sock:ro   # container status widgets
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
   # ---------------------------------------------------------------------------
-  # SYSTEM MONITORING
+  # SYSTEM MONITORING - Uptime Kuma                   http://NAS_IP:3001
   # ---------------------------------------------------------------------------
-  # Uptime Kuma - System monitoring and uptime tracking
+  # Uptime checks for all stacks + Discord notifications. LAN-only
+  # (public hostname removed 2026-10-22).
   uptime-kuma:
     image: louislam/uptime-kuma:latest
     container_name: uptime-kuma
     hostname: uptime-kuma
     restart: unless-stopped
-    
-    # Direct network access
     networks:
       infrastructure-network:
         ipv4_address: 172.43.0.3
-    
-    # External access to web interface
     ports:
       - "${UPTIME_KUMA_PORT:-3001}:3001"
-    
-    # User and system configuration
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-    
-    # Persistent storage
     volumes:
       - ${INFRASTRUCTURE_CONFIG_PATH}/uptime-kuma:/app/data
       - /etc/localtime:/etc/localtime:ro
-    
-    # Update management
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
   # ---------------------------------------------------------------------------
-  # AUTOMATIC UPDATES
+  # AUTOMATIC UPDATES - Watchtower                    (no web UI)
   # ---------------------------------------------------------------------------
-  # Automatic container updates with cleanup and notifications
+  # Updates ONLY containers labelled com.centurylinklabs.watchtower.enable=true,
+  # on ALL stacks of this host. Schedule is 6-field cron (seconds first):
+  # "0 0 6 * * *" = 06:00 daily. Posts results to Discord via
+  # WATCHTOWER_NOTIFICATION_URL (discord://TOKEN@WEBHOOKID - rotated 2026-10-22).
   watchtower:
-    image: containrrr/watchtower:latest
+    image: nickfedor/watchtower:latest
     container_name: watchtower-infrastructure
     hostname: watchtower-infrastructure
     restart: unless-stopped
-    
-    # Internal network (no external access needed)
     networks:
       infrastructure-network:
         ipv4_address: 172.43.0.4
-    
-    # System configuration
     environment:
       - TZ=${TZ}
       - WATCHTOWER_CLEANUP=${WATCHTOWER_CLEANUP:-true}
       - WATCHTOWER_REMOVE_VOLUMES=${WATCHTOWER_REMOVE_VOLUMES:-false}
       - WATCHTOWER_INCLUDE_STOPPED=${WATCHTOWER_INCLUDE_STOPPED:-true}
-      - WATCHTOWER_SCHEDULE=${WATCHTOWER_SCHEDULE:-0 6 * * *}
+      - WATCHTOWER_SCHEDULE=${WATCHTOWER_SCHEDULE:-0 0 6 * * *}
       - WATCHTOWER_LABEL_ENABLE=${WATCHTOWER_LABEL_ENABLE:-true}
       - WATCHTOWER_NOTIFICATIONS=${WATCHTOWER_NOTIFICATIONS:-}
       - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL:-}
       - WATCHTOWER_DEBUG=${WATCHTOWER_DEBUG:-false}
-    
-    # Docker socket access for container management
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
-  # Note: Portainer is managed separately via setup.sh
+  # ---------------------------------------------------------------------------
+  # INVENTORY - NetBox                                http://NAS_IP:8010
+  # ---------------------------------------------------------------------------
+  # Source of truth for hardware (DCIM: rack, devices, disks, cables) and
+  # networks (IPAM: LAN, Docker subnets, services/ports, public hostnames).
+  # First start runs ~150 DB migrations - can take several minutes, hence the
+  # long start_period. LAN-only.
+  netbox:
+    <<: *netbox
+    container_name: netbox
+    hostname: netbox
+    depends_on:
+      netbox-postgres:
+        condition: service_healthy
+      netbox-redis:
+        condition: service_started
+    networks:
+      infrastructure-network:
+        ipv4_address: 172.43.0.10
+    ports:
+      - "${NETBOX_PORT:-8010}:8080"   # 8000 is taken by Portainer's edge agent
+    healthcheck:
+      test: curl -f http://localhost:8080/login/ || exit 1
+      start_period: 900s
+      timeout: 5s
+      interval: 15s
+
+  # Background jobs (scripts, reports, webhooks). Starts after netbox is healthy.
+  netbox-worker:
+    <<: *netbox
+    container_name: netbox-worker
+    hostname: netbox-worker
+    depends_on:
+      netbox:
+        condition: service_healthy
+    networks:
+      infrastructure-network:
+        ipv4_address: 172.43.0.11
+    command: ["/opt/netbox/venv/bin/python", "/opt/netbox/netbox/manage.py", "rqworker"]
+    healthcheck:
+      test: ps -aux | grep -v grep | grep -q rqworker || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+
+  # NetBox database. Postgres 18 stores data under /var/lib/postgresql/18/...
+  # so the volume mounts /var/lib/postgresql (NOT .../data). Stay on major 18;
+  # a major upgrade needs dump + restore.
+  netbox-postgres:
+    image: docker.io/postgres:18-alpine
+    container_name: netbox-postgres
+    hostname: netbox-postgres
+    restart: unless-stopped
+    networks:
+      infrastructure-network:
+        ipv4_address: 172.43.0.12
+    environment:
+      POSTGRES_DB: netbox
+      POSTGRES_USER: netbox
+      POSTGRES_PASSWORD: ${NETBOX_DB_PASSWORD}
+    volumes:
+      - netbox-postgres:/var/lib/postgresql
+    healthcheck:
+      test: pg_isready -q -t 2 -d netbox -U netbox
+      start_period: 20s
+      timeout: 30s
+      interval: 10s
+      retries: 5
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+
+  # NetBox task queue + cache (Valkey = open-source Redis fork).
+  netbox-redis:
+    image: docker.io/valkey/valkey:9-alpine
+    container_name: netbox-redis
+    hostname: netbox-redis
+    restart: unless-stopped
+    networks:
+      infrastructure-network:
+        ipv4_address: 172.43.0.13
+    command: ["sh", "-c", "valkey-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    environment:
+      REDIS_PASSWORD: ${NETBOX_REDIS_PASSWORD}
+    volumes:
+      - netbox-redis:/data
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+
+  # Note: Portainer runs as a standalone container (not part of any stack).
 
 # =============================================================================
-# INTEGRATION NOTES
+# REQUIRED ENVIRONMENT VARIABLES (Portainer -> Stack -> Environment variables)
 # =============================================================================
+# General:   TZ, PUID, PGID, DOCKER_GID, INFRASTRUCTURE_CONFIG_PATH, NAS_IP
+# Homepage:  HOMEPAGE_PORT, HOMEPAGE_ALLOWED_HOSTS (comma-separated), *_API_KEY,
+#            QBIT_USER, QBIT_PASS, PLEX_TOKEN
+# Kuma:      UPTIME_KUMA_PORT
+# Watchtower: WATCHTOWER_* (SCHEDULE must be 6-field), WATCHTOWER_NOTIFICATION_URL
+# NetBox:    NETBOX_ALLOWED_HOSTS (space-separated), NETBOX_SECRET_KEY,
+#            NETBOX_API_TOKEN_PEPPER, NETBOX_DB_PASSWORD, NETBOX_REDIS_PASSWORD,
+#            NETBOX_SUPERUSER_NAME/_EMAIL/_PASSWORD
+#            optional: NETBOX_IMAGE_TAG (default v4.7-5.1.0), NETBOX_PORT (8010)
 #
-# INFRASTRUCTURE STACK INTEGRATION:
-# • Homarr provides unified dashboard for all homelab services
-# • Uptime Kuma monitors all services across all stacks
-# • Watchtower handles automatic updates for infrastructure services
-# • Can monitor services from SERVARR, STREAMARR, CREATARR, and BUSINESS stacks
-#
-# NETWORK COMMUNICATION:
-# • Infrastructure services: 172.43.0.0/24 network
-# • Servarr services: 172.39.0.0/24 network
-# • Streamarr services: 172.40.0.0/24 network
-# • Creatarr services: 172.41.0.0/24 network
-# • Business services: 172.42.0.0/24 network
-# • Inter-stack communication via host networking
-# • Homarr accesses Docker socket to discover all containers
-# • Uptime Kuma monitors services via HTTP/HTTPS endpoints
-#
-# DATA FLOW:
-# 1. Homarr: Discovers all Docker containers via socket
-# 2. Uptime Kuma: Monitors service health via configured endpoints
-# 3. Watchtower: Updates infrastructure stack containers automatically
-# 4. Users: Access unified dashboard and monitoring via web interfaces
-#
+# =============================================================================
+# NETWORK MAP (your NAS Docker networks)
+# =============================================================================
+# • Infrastructure  172.43.0.0/24  (this stack)
+# • Servarr         172.39.0.0/24  (gluetun, *arr, qbittorrent, sabnzbd, filebot)
+# • Streamarr       172.40.0.0/24  (plex, seerr, tautulli, ersatztv, navidrome)
+# • Creatarr        172.41.0.0/24  (n8n, n8n-postgres)
+# • Business        172.42.0.0/24  (reserved)
+# • npm / cloudflared / portainer: 172.17-172.20 (Docker defaults)
+# UGOS firewall (default Deny): allow 192.168.1.0/24, 172.16.0.0/12,
+# 172.32.0.0/11, and 32400/tcp (Plex). New stacks: pick a free /24 inside
+# 172.21-172.31 (or 172.32-172.63) so they're covered.
 # =============================================================================
 # END OF INFRASTRUCTURE STACK CONFIGURATION
 # =============================================================================
-

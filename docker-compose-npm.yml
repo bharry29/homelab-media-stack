@@ -1,0 +1,25 @@
+services:
+ nginx-proxy-manager:
+  image: jc21/nginx-proxy-manager
+  container_name: Nginx-Proxy-Manager
+  healthcheck:
+      test: timeout 10s bash -c ':> /dev/tcp/127.0.0.1/81' || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+  volumes:
+    - /volume1/docker/npm/letsencrypt:/etc/letsencrypt:rw
+    - /volume1/docker/npm/data:/data:rw
+    - /volume1/docker/npm/config.json:/app/config/production.json
+  environment:
+    TZ: America/Los_Angeles
+    INITIAL_ADMIN_EMAIL: ${NPM_ADMIN_EMAIL}
+    INITIAL_ADMIN_PASSWORD: ${NPM_ADMIN_PASSWORD}
+  ports:
+    - 443:443
+    - 81:81
+    - 80:80
+  restart: unless-stopped
+  labels:
+    - "com.centurylinklabs.watchtower.enable=true"

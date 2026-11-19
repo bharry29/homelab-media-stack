@@ -15,7 +15,7 @@
 # Deploy: docker-compose --env-file .env-streamarr -f docker-compose-streamarr.yml up -d
 # =============================================================================
 
-version: '3.8'
+version: "3.8"
 
 # =============================================================================
 # NETWORKS
@@ -27,7 +27,6 @@ networks:
     ipam:
       config:
         - subnet: 172.40.0.0/24
-          gateway: 172.40.0.1
 
 # =============================================================================
 # SERVICES
@@ -42,9 +41,6 @@ services:
     container_name: plex
     image: ghcr.io/hotio/plex
     restart: unless-stopped
-    
-    # User and group configuration for proper permissions
-    user: "${PUID}:${PGID}"
     
     # Network configuration
     networks:
@@ -76,54 +72,38 @@ services:
       - ${STREAMARR_CONFIG_PATH}/plex:/config
       - ${DATA_PATH}/plex_transcode:/transcode
       - ${DATA_PATH}:/data
-      - /etc/localtime:/etc/localtime:ro
     
     # Update management
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
   # ---------------------------------------------------------------------------
-  # REQUEST MANAGEMENT
+  # REQUEST MANAGEMENT - SEERR
   # ---------------------------------------------------------------------------
-  # User-friendly interface for content requests and management
-  overseerr:
-    container_name: overseerr
-    image: lscr.io/linuxserver/overseerr:latest
+  # Replaces Overseerr. Runs as UID 1000 internally (ignores PUID/PGID), so
+  # its config folder must be owned by 1000:1000. Migrates Overseerr data
+  # automatically on first start - see migration steps.
+  seerr:
+    container_name: seerr
+    image: ghcr.io/seerr-team/seerr:latest
     restart: unless-stopped
-    
-    # User and group configuration for proper permissions
-    user: "${PUID}:${PGID}"
-    
-    # Network configuration
     networks:
       streamarr-network:
         ipv4_address: 172.40.0.3
-    
-    # Port mapping
     ports:
-      - "${OVERSEERR_PORT:-5055}:5055"
-    
-    # Environment configuration
+      - "${SEERR_PORT:-5055}:5055"
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
       - TZ=${TZ}
-      - LOG_LEVEL=${OVERSEERR_LOG_LEVEL:-info}
-    
-    # Persistent storage and media access
+      - LOG_LEVEL=${SEERR_LOG_LEVEL:-info}
+      - PORT=5055
     volumes:
-      - ${STREAMARR_CONFIG_PATH}/overseerr:/config
-      - /etc/localtime:/etc/localtime:ro
-    
-    # Health monitoring
+      - ${STREAMARR_CONFIG_PATH}/seerr:/app/config
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5055/api/v1/status"]
+      test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/status || exit 1
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
-    
-    # Update management
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
@@ -135,9 +115,6 @@ services:
     container_name: tautulli
     image: lscr.io/linuxserver/tautulli:latest
     restart: unless-stopped
-    
-    # User and group configuration for proper permissions
-    user: "${PUID}:${PGID}"
     
     # Network configuration
     networks:
@@ -179,9 +156,6 @@ services:
     container_name: ersatztv
     image: jasongdove/ersatztv:latest
     restart: unless-stopped
-    
-    # User and group configuration for proper permissions
-    user: "${PUID}:${PGID}"
     
     # Network configuration
     networks:
@@ -248,10 +222,6 @@ services:
     # Update management
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-
-  # Note: Automatic updates handled by watchtower-infrastructure in INFRASTRUCTURE stack
-  # All services have watchtower labels (com.centurylinklabs.watchtower.enable=true)
-  # watchtower-infrastructure monitors and updates all labeled containers
 
 # =============================================================================
 # INTEGRATION NOTES

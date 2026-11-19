@@ -1,27 +1,7 @@
 # =============================================================================
-# CREATARR STACK - Creative & Entertainment Services
-# =============================================================================
-#
-# This stack handles creative content and entertainment services:
-# • Gaming & ROM management (RetroArch)
-# • Comics & Manga management (Komga)
-# • Audio services (Audiobookshelf)
-# • Books & Reading (Calibre-Web)
-# • Music creation tools (Noisedash, Swing Music)
-# • Automatic updates handled by infrastructure watchtower
-#
-# Network: 172.41.0.0/24 (isolated from other stacks)
-# Data: Shared /data volume with other stacks
-# Environment: Configure via .env-creatarr file
-#
-# Deploy: docker-compose --env-file .env-creatarr -f docker-compose-creatarr.yml up -d
+# CREATARR STACK - Creative Content & Family Life Management
 # =============================================================================
 
-version: '3.8'
-
-# =============================================================================
-# NETWORKS
-# =============================================================================
 networks:
   creatarr-network:
     name: creatarr-network
@@ -29,269 +9,67 @@ networks:
     ipam:
       config:
         - subnet: 172.41.0.0/24
-          gateway: 172.41.0.1
 
-# =============================================================================
-# SERVICES
-# =============================================================================
 services:
-
-  # ---------------------------------------------------------------------------
-  # GAMING & ROM MANAGEMENT
-  # ---------------------------------------------------------------------------
-  # Universal emulator frontend for playing ROMs across all platforms
-  retroarch:
-    image: lscr.io/linuxserver/retroarch:latest
-    container_name: retroarch
-    hostname: retroarch
+  n8n-postgres:
+    image: postgres:15-alpine
+    container_name: n8n-postgres
+    hostname: n8n-postgres
     restart: unless-stopped
-    
-    # Direct network access for web interface
     networks:
       creatarr-network:
-        ipv4_address: 172.41.0.2
-    
-    # External access to web interface
+        ipv4_address: 172.41.0.10
+    environment:
+      - POSTGRES_DB=${N8N_DB_NAME}
+      - POSTGRES_USER=${N8N_DB_USER}
+      - POSTGRES_PASSWORD=${N8N_DB_PASSWORD}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - ${CREATARR_CONFIG_PATH}/n8n-postgres:/var/lib/postgresql/data
+      - /etc/localtime:/etc/localtime:ro
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    hostname: n8n
+    restart: unless-stopped
+    networks:
+      creatarr-network:
+        ipv4_address: 172.41.0.11
     ports:
-      - "${RETROARCH_PORT:-8081}:8080"
-    
-    # User and system configuration
+      - "${N8N_PORT}:5678"
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-    
-    # Persistent storage and ROM access
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=${N8N_PROTOCOL}
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL}
+      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL}
+      - GENERIC_TIMEZONE=${TZ}
+      - N8N_DATABASE_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=n8n-postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${N8N_DB_NAME}
+      - DB_POSTGRESDB_USER=${N8N_DB_USER}
+      - DB_POSTGRESDB_PASSWORD=${N8N_DB_PASSWORD}
+      - N8N_LOG_LEVEL=${N8N_LOG_LEVEL}
+      - N8N_LOG_OUTPUT=console
+      - N8N_METRICS=true
+      - N8N_DIAGNOSTICS_ENABLED=true
+      - N8N_PROXY_HOPS=2
+      - N8N_PUSH_BACKEND=websocket
+      - VUE_APP_URL_BASE_API=${N8N_EDITOR_BASE_URL}
     volumes:
-      - ${CREATARR_CONFIG_PATH}/retroarch:/config
-      - ${DATA_PATH}/roms:/roms
-      - ${DATA_PATH}/saves:/saves
+      - ${CREATARR_CONFIG_PATH}/n8n:/home/node/.n8n
       - /etc/localtime:/etc/localtime:ro
-    
-    # Update management
+    depends_on:
+      - n8n-postgres
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-
-  # ---------------------------------------------------------------------------
-  # COMICS & MANGA MANAGEMENT
-  # ---------------------------------------------------------------------------
-  # Complete comics, manga, and graphic novels server
-  komga:
-    image: gotson/komga:latest
-    container_name: komga
-    hostname: komga
-    restart: unless-stopped
-    
-    # Direct network access
-    networks:
-      creatarr-network:
-        ipv4_address: 172.41.0.3
-    
-    # External access to web interface
-    ports:
-      - "${KOMGA_PORT:-25600}:25600"
-    
-    # User and system configuration
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - KOMGA_LIBRARIES_SCAN_CRON=0 0 * * *
-      - KOMGA_LIBRARIES_SCAN_STARTUP=true
-      - KOMGA_LIBRARIES_SCAN_DIRECTORY_EXCLUDE=@eaDir,@Recycle
-      - KOMGA_WEBADMIN_ENABLED=true
-      - KOMGA_WEBADMIN_USERNAME=${KOMGA_ADMIN_USER:-admin}
-      - KOMGA_WEBADMIN_PASSWORD=${KOMGA_ADMIN_PASSWORD:-admin}
-    
-    # Persistent storage and comics access
-    volumes:
-      - ${CREATARR_CONFIG_PATH}/komga:/config
-      - ${DATA_PATH}/comics:/comics
-      - /etc/localtime:/etc/localtime:ro
-    
-    # Update management
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
-
-  # ---------------------------------------------------------------------------
-  # MUSIC PRODUCTION & CREATIVE AUDIO
-  # ---------------------------------------------------------------------------
-  # Noisedash - Self-hostable web tool for generating ambient noises
-  noisedash:
-    image: noisedash/noisedash:latest
-    container_name: noisedash
-    hostname: noisedash
-    restart: unless-stopped
-    
-    # Direct network access
-    networks:
-      creatarr-network:
-        ipv4_address: 172.41.0.4
-    
-    # External access to web interface
-    ports:
-      - "${NOISEDASH_PORT:-3002}:1432"
-    
-    # User and system configuration
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-    
-    # Persistent storage for configuration, samples, and database
-    volumes:
-      - ${CREATARR_CONFIG_PATH}/noisedash/config:/var/noisedash/config
-      - ${CREATARR_CONFIG_PATH}/noisedash/samples:/var/noisedash/samples
-      - ${CREATARR_CONFIG_PATH}/noisedash/db:/var/noisedash/db
-      - /etc/localtime:/etc/localtime:ro
-    
-    # Update management
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
-
-  # Swing Music - Beautiful self-hosted music player for local audio files
-  swing-music:
-    image: ghcr.io/swingmx/swingmusic:latest
-    container_name: swing-music
-    hostname: swing-music
-    restart: unless-stopped
-    
-    # Direct network access
-    networks:
-      creatarr-network:
-        ipv4_address: 172.41.0.5
-    
-    # External access to web interface
-    ports:
-      - "${SWING_MUSIC_PORT:-1970}:1970"
-    
-    # Resource limits and security
-    mem_limit: 6g
-    cpu_shares: 768
-    security_opt:
-      - no-new-privileges:true
-    
-    # User and system configuration
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-    
-    # Persistent storage and music access
-    volumes:
-      - ${CREATARR_CONFIG_PATH}/swing-music:/config:rw
-      - ${DATA_PATH}/music:/music:rw
-      - /etc/localtime:/etc/localtime:ro
-    
-    # Update management
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
-
-  # ---------------------------------------------------------------------------
-  # AUDIO & MUSIC SERVICES
-  # ---------------------------------------------------------------------------
-  # Family audio library for audiobooks, podcasts, and educational content
-  audiobookshelf:
-    image: ghcr.io/advplyr/audiobookshelf:latest
-    container_name: audiobookshelf
-    hostname: audiobookshelf
-    restart: unless-stopped
-    
-    # Direct network access
-    networks:
-      creatarr-network:
-        ipv4_address: 172.41.0.6
-    
-    # External access to web interface
-    ports:
-      - "${AUDIOBOOKSHELF_PORT:-13378}:13378"
-    
-    # User and system configuration
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-    
-    # Persistent storage and audio access
-    volumes:
-      - ${CREATARR_CONFIG_PATH}/audiobookshelf:/config
-      - ${DATA_PATH}/audiobooks:/audiobooks
-      - ${DATA_PATH}/podcasts:/podcasts
-      - /etc/localtime:/etc/localtime:ro
-    
-    # Update management
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
-
-  # ---------------------------------------------------------------------------
-  # BOOKS & READING
-  # ---------------------------------------------------------------------------
-  # Complete ebook management, reading, and conversion
-  calibre-web:
-    image: lscr.io/linuxserver/calibre-web:latest
-    container_name: calibre-web
-    hostname: calibre-web
-    restart: unless-stopped
-    
-    # Direct network access
-    networks:
-      creatarr-network:
-        ipv4_address: 172.41.0.7
-    
-    # External access to web interface
-    ports:
-      - "${CALIBRE_WEB_PORT:-8083}:8083"
-    
-    # User and system configuration
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - DOCKER_MODS=linuxserver/mods:universal-calibre
-      - CALIBRE_DBPATH=/config/calibre-web/app.db
-      - CALIBRE_CONFIG_DIRECTORY=/config/calibre-web
-    
-    # Persistent storage and books access
-    volumes:
-      - ${CREATARR_CONFIG_PATH}/calibre-web:/config
-      - ${DATA_PATH}/books:/books
-      - /etc/localtime:/etc/localtime:ro
-    
-    # Update management
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
-
-  # Note: n8n and Mealie moved to BUSINESS stack
-  # Note: Automatic updates handled by watchtower-infrastructure in INFRASTRUCTURE stack
-
-# =============================================================================
-# INTEGRATION NOTES
-# =============================================================================
-#
-# CREATARR STACK INTEGRATION:
-# • Shares media files via ${DATA_PATH}/ directory with other stacks
-# • RetroArch accesses ROMs from /data/roms/
-# • Komga serves comics from /data/comics/
-# • Audiobookshelf manages audio from /data/audiobooks/ and /data/podcasts/
-# • Calibre-Web manages ebooks from /data/books/
-# • Noisedash and Swing Music provide music creation and playback tools
-#
-# NETWORK COMMUNICATION:
-# • Creatarr services: 172.41.0.0/24 network
-# • Servarr services: 172.39.0.0/24 network
-# • Streamarr services: 172.40.0.0/24 network
-# • Business services: 172.42.0.0/24 network
-# • Infrastructure services: 172.43.0.0/24 network
-# • Inter-stack communication via host networking
-# • No direct container-to-container networking between stacks
-#
-# DATA FLOW:
-# 1. Servarr stack: Downloads → Processing → /data/media/
-# 2. Streamarr stack: Serves content from /data/media/
-# 3. Creatarr stack: Serves additional content from /data/roms/, /data/comics/, etc.
-# 4. Users: Access all content through respective web interfaces
-# 5. Monitoring: UptimeKuma in INFRASTRUCTURE stack tracks all services
-#
-# =============================================================================
-# END OF CREATARR STACK CONFIGURATION
-# =============================================================================
